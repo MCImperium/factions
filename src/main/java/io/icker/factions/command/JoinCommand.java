@@ -9,15 +9,15 @@ import io.icker.factions.api.persistents.Faction;
 import io.icker.factions.api.persistents.User;
 import io.icker.factions.util.Command;
 import io.icker.factions.util.Message;
-import net.minecraft.server.command.CommandManager;
-import net.minecraft.server.command.ServerCommandSource;
-import net.minecraft.server.network.ServerPlayerEntity;
+import net.minecraft.commands.CommandSourceStack;
+import net.minecraft.commands.Commands;
+import net.minecraft.server.level.ServerPlayer;
 
 public class JoinCommand implements Command {
-    private int run(CommandContext<ServerCommandSource> context) throws CommandSyntaxException {
+    private int run(CommandContext<CommandSourceStack> context) throws CommandSyntaxException {
         String name = StringArgumentType.getString(context, "name");
-        ServerCommandSource source = context.getSource();
-        ServerPlayerEntity player = source.getPlayer();
+        CommandSourceStack source = context.getSource();
+        ServerPlayer player = source.getPlayer();
 
         Faction faction = Faction.getByName(name);
 
@@ -26,7 +26,7 @@ public class JoinCommand implements Command {
             return 0;
         }
 
-        boolean invited = faction.isInvited(player.getUuid());
+        boolean invited = faction.isInvited(player.getUUID());
 
         if (!faction.isOpen() && !invited) {
             new Message("Cannot join faction as it is not open and you are not invited").fail().send(player, false);
@@ -38,21 +38,21 @@ public class JoinCommand implements Command {
             return 0;
         }
 
-        if (invited) faction.invites.remove(player.getUuid());
+        if (invited) faction.invites.remove(player.getUUID());
         Command.getUser(player).joinFaction(faction.getID(), User.Rank.MEMBER);
-        source.getServer().getPlayerManager().sendCommandTree(player);
+        source.getServer().getPlayerList().sendPlayerPermissionLevel(player);
 
         new Message(player.getName().getString() + " joined").send(faction);
         faction.adjustPower(FactionsMod.CONFIG.POWER.MEMBER);
         return 1;
     }
 
-    public LiteralCommandNode<ServerCommandSource> getNode() {
-        return CommandManager
+    public LiteralCommandNode<CommandSourceStack> getNode() {
+        return Commands
             .literal("join")
             .requires(Requires.multiple(Requires.isFactionless(), Requires.hasPerms("factions.join", 0)))
             .then(
-                CommandManager.argument("name", StringArgumentType.greedyString())
+                Commands.argument("name", StringArgumentType.greedyString())
                 .suggests(Suggests.openInvitedFactions())
                 .executes(this::run)
             )

@@ -5,27 +5,33 @@ import io.icker.factions.api.persistents.Claim;
 import io.icker.factions.api.persistents.Faction;
 import io.icker.factions.api.persistents.User;
 import io.icker.factions.util.Message;
-import net.fabricmc.fabric.api.networking.v1.PacketSender;
-import net.fabricmc.fabric.api.networking.v1.ServerPlayConnectionEvents;
-import net.minecraft.server.MinecraftServer;
-import net.minecraft.server.network.ServerPlayNetworkHandler;
-import net.minecraft.server.network.ServerPlayerEntity;
+import net.minecraft.server.level.ServerPlayer;
+import net.minecraftforge.event.entity.player.PlayerEvent;
+import net.minecraftforge.event.server.ServerStoppingEvent;
+import net.minecraftforge.eventbus.api.SubscribeEvent;
 
 public class ServerManager {
     public static void register() {
-        ServerPlayConnectionEvents.JOIN.register(ServerManager::playerJoin);
-        MiscEvents.ON_SAVE.register(ServerManager::save);
     }
 
-    private static void save(MinecraftServer server) {
+    @SubscribeEvent
+    public static void save(MiscEvents.OnSave event) {
         Claim.save();
         Faction.save();
         User.save();
     }
 
-    private static void playerJoin(ServerPlayNetworkHandler handler, PacketSender sender, MinecraftServer server) {
-        ServerPlayerEntity player = handler.getPlayer();
-        User user = User.get(player.getUuid());
+    @SubscribeEvent
+    public static void save(ServerStoppingEvent event) {
+        Claim.save();
+        Faction.save();
+        User.save();
+    }
+
+    @SubscribeEvent
+    public static void playerJoin(PlayerEvent.PlayerLoggedInEvent event) {
+        ServerPlayer player = (ServerPlayer) event.getEntity();
+        User user = User.get(player.getUUID());
 
         if (user.isInFaction()) {
             Faction faction = user.getFaction();

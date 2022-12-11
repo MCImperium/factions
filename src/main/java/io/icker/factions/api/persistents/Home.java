@@ -1,5 +1,6 @@
 package io.icker.factions.api.persistents;
 
+import io.icker.factions.api.persistents.Faction;
 import io.icker.factions.database.Field;
 
 import java.util.UUID;
@@ -38,7 +39,7 @@ public class Home {
     @SuppressWarnings("unused")
     public Home() {}
 
-    public Faction getFaction() {
+    public io.icker.factions.api.persistents.Faction getFaction() {
         return Faction.get(factionID);
     }
 }

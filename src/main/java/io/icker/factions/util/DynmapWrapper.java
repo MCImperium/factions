@@ -1,5 +1,6 @@
 package io.icker.factions.util;
 
+import net.minecraftforge.eventbus.api.SubscribeEvent;
 import org.dynmap.DynmapCommonAPI;
 import org.dynmap.DynmapCommonAPIListener;
 import org.dynmap.markers.AreaMarker;
@@ -12,7 +13,7 @@ import io.icker.factions.api.events.FactionEvents;
 import io.icker.factions.api.persistents.Claim;
 import io.icker.factions.api.persistents.Faction;
 import io.icker.factions.api.persistents.Home;
-import net.minecraft.util.math.ChunkPos;
+import net.minecraft.world.level.ChunkPos;
 
 public class DynmapWrapper {
     private DynmapCommonAPI api;
@@ -32,22 +33,13 @@ public class DynmapWrapper {
                 generateMarkers();
             }
         });
-
-        ClaimEvents.ADD.register(this::addClaim);
-        ClaimEvents.REMOVE.register(this::removeClaim);
-
-        FactionEvents.SET_HOME.register(this::setHome);
-        FactionEvents.MODIFY.register(faction -> updateFaction(faction));
-        FactionEvents.MEMBER_JOIN.register((faction, user) -> updateFaction(faction));
-        FactionEvents.MEMBER_LEAVE.register((faction, user) -> updateFaction(faction));
-        FactionEvents.POWER_CHANGE.register((faction, oldPower) -> updateFaction(faction));
     }
 
     private void generateMarkers() {
         for (Faction faction : Faction.all()) {
             Home home = faction.getHome();
             if (home != null) {
-                setHome(faction, home);
+                actuallySetHome(faction, home);
             }
 
             String info = getInfo(faction);
@@ -58,44 +50,80 @@ public class DynmapWrapper {
     }
 
     private void addClaim(Claim claim, String factionInfo) {
-        Faction faction = claim.getFaction(); 
+        Faction faction = claim.getFaction();
         ChunkPos pos = new ChunkPos(claim.x, claim.z);
 
         AreaMarker marker = markerSet.createAreaMarker(
-            claim.getKey(), factionInfo, 
-            true, dimensionTagToID(claim.level), 
-            new double[]{pos.getStartX(), pos.getEndX() + 1}, 
-            new double[]{pos.getStartZ(), pos.getEndZ() + 1},
-            true
+                claim.getKey(), factionInfo,
+                true, dimensionTagToID(claim.level),
+                new double[]{pos.getMinBlockX(), pos.getMaxBlockX() + 1},
+                new double[]{pos.getMinBlockZ(), pos.getMaxBlockZ() + 1},
+                true
         );
         if (marker != null) {
-            marker.setFillStyle(marker.getFillOpacity(), faction.getColor().getColorValue());
-            marker.setLineStyle(marker.getLineWeight(), marker.getLineOpacity(), faction.getColor().getColorValue());
+            marker.setFillStyle(marker.getFillOpacity(), faction.getColor().getColor());
+            marker.setLineStyle(marker.getLineWeight(), marker.getLineOpacity(), faction.getColor().getColor());
         }
     }
 
-    private void addClaim(Claim claim) {
+    @SubscribeEvent
+    public void addClaim(ClaimEvents.Add event) {
+        Claim claim = event.claim;
         addClaim(claim, getInfo(claim.getFaction()));
     }
 
-    private void removeClaim(int x, int z, String level, Faction faction) {
+    @SubscribeEvent
+    public void removeClaim(ClaimEvents.Remove event) {
+        int x = event.x;
+        int z = event.z;
+        String level = event.level;
         String areaMarkerId = String.format("%s-%d-%d", level, x, z);
         markerSet.findAreaMarker(areaMarkerId).deleteMarker();
     }
+    @SubscribeEvent
+    public void updateFaction(FactionEvents.Modify event) {
+        Faction faction = event.faction;
+        actuallyUpdateFaction(faction);
+    }
 
-    private void updateFaction(Faction faction) {
+    @SubscribeEvent
+    public void updateFaction(FactionEvents.MemberJoin event) {
+        Faction faction = event.faction;
+        actuallyUpdateFaction(faction);
+    }
+
+    @SubscribeEvent
+    public void updateFaction(FactionEvents.MemberLeave event) {
+        Faction faction = event.faction;
+        actuallyUpdateFaction(faction);
+    }
+
+    @SubscribeEvent
+    public void updateFaction(FactionEvents.PowerChange event) {
+        Faction faction = event.faction;
+        actuallyUpdateFaction(faction);
+    }
+
+    private void actuallyUpdateFaction(Faction faction) {
         String info = getInfo(faction);
 
         for (Claim claim : faction.getClaims()) {
             AreaMarker marker = markerSet.findAreaMarker(claim.getKey());
 
-            marker.setFillStyle(marker.getFillOpacity(), faction.getColor().getColorValue());
-            marker.setLineStyle(marker.getLineWeight(), marker.getLineOpacity(), faction.getColor().getColorValue());
+            marker.setFillStyle(marker.getFillOpacity(), faction.getColor().getColor());
+            marker.setLineStyle(marker.getLineWeight(), marker.getLineOpacity(), faction.getColor().getColor());
             marker.setDescription(info);
         }
     }
 
-    private void setHome(Faction faction, Home home) {
+    @SubscribeEvent
+    public void setHome(FactionEvents.SetHome event) {
+        Faction faction = event.faction;
+        Home home = event.home;
+        actuallySetHome(faction, home);
+
+    }
+    private void actuallySetHome(Faction faction, Home home) {
         Marker marker = markerSet.findMarker(faction.getID().toString() + "-home");
         if (marker == null) {
             markerSet.createMarker("home", faction.getName() + "'s Home", dimensionTagToID(home.level), home.x, home.y, home.z, null, true);
@@ -113,10 +141,10 @@ public class DynmapWrapper {
 
     private String getInfo(Faction faction) {
         return "Name: " + faction.getName() + "<br>"
-            + "Description: " + faction.getDescription() + "<br>"
-            + "Power: " + faction.getPower() + "<br>"
-            + "Number of members: " + faction.getUsers().size();// + "<br>"
-            //+ "Allies: " + Ally.getAllies(faction.getName).stream().map(ally -> ally.target).collect(Collectors.joining(", "));
+                + "Description: " + faction.getDescription() + "<br>"
+                + "Power: " + faction.getPower() + "<br>"
+                + "Number of members: " + faction.getUsers().size();// + "<br>"
+        //+ "Allies: " + Ally.getAllies(faction.getName).stream().map(ally -> ally.target).collect(Collectors.joining(", "));
     }
 
     public void reloadAll() {

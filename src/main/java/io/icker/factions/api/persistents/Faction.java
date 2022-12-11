@@ -5,8 +5,9 @@ import io.icker.factions.api.events.FactionEvents;
 import io.icker.factions.database.Database;
 import io.icker.factions.database.Field;
 import io.icker.factions.database.Name;
-import net.minecraft.inventory.SimpleInventory;
-import net.minecraft.util.Formatting;
+import net.minecraft.ChatFormatting;
+import net.minecraft.world.SimpleContainer;
+import net.minecraftforge.common.MinecraftForge;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.*;
@@ -40,21 +41,21 @@ public class Faction {
     private int power;
 
     @Field("Home")
-    private Home home;
+    private io.icker.factions.api.persistents.Home home;
 
     @Field("Safe")
-    private SimpleInventory safe = new SimpleInventory(54);
+    private SimpleContainer safe = new SimpleContainer(54);
 
     @Field("Invites")
     public ArrayList<UUID> invites = new ArrayList<>();
 
     @Field("Relationships")
-    private ArrayList<Relationship> relationships = new ArrayList<>();
+    private ArrayList<io.icker.factions.api.persistents.Relationship> relationships = new ArrayList<>();
 
     @Field("GuestPermissions")
-    public ArrayList<Relationship.Permissions> guest_permissions = new ArrayList<>(FactionsMod.CONFIG.RELATIONSHIPS.DEFAULT_GUEST_PERMISSIONS);
+    public ArrayList<io.icker.factions.api.persistents.Relationship.Permissions> guest_permissions = new ArrayList<>(FactionsMod.CONFIG.RELATIONSHIPS.DEFAULT_GUEST_PERMISSIONS);
 
-    public Faction(String name, String description, String motd, Formatting color, boolean open, int power) {
+    public Faction(String name, String description, String motd, ChatFormatting color, boolean open, int power) {
         this.id = UUID.randomUUID();
         this.name = name;
         this.motd = motd;
@@ -110,8 +111,8 @@ public class Faction {
         return name;
     }
 
-    public Formatting getColor() {
-        return Formatting.byName(color);
+    public ChatFormatting getColor() {
+        return ChatFormatting.getByName(color);
     }
 
     public String getDescription() {
@@ -126,7 +127,7 @@ public class Faction {
         return power;
     }
 
-    public SimpleInventory getSafe() {
+    public SimpleContainer getSafe() {
         return safe;
     }
 
@@ -136,27 +137,27 @@ public class Faction {
 
     public void setName(String name) {
         this.name = name;
-        FactionEvents.MODIFY.invoker().onModify(this);
+        MinecraftForge.EVENT_BUS.post(new FactionEvents.Modify(this));
     }
 
     public void setDescription(String description) {
         this.description = description;
-        FactionEvents.MODIFY.invoker().onModify(this);
+        MinecraftForge.EVENT_BUS.post(new FactionEvents.Modify(this));
     }
 
     public void setMOTD(String motd) {
         this.motd = motd;
-        FactionEvents.MODIFY.invoker().onModify(this);
+        MinecraftForge.EVENT_BUS.post(new FactionEvents.Modify(this));
     }
 
-    public void setColor(Formatting color) {
+    public void setColor(ChatFormatting color) {
         this.color = color.getName();
-        FactionEvents.MODIFY.invoker().onModify(this);
+        MinecraftForge.EVENT_BUS.post(new FactionEvents.Modify(this));
     }
 
     public void setOpen(boolean open) {
         this.open = open;
-        FactionEvents.MODIFY.invoker().onModify(this);
+        MinecraftForge.EVENT_BUS.post(new FactionEvents.Modify(this));
     }
 
     public int adjustPower(int adjustment) {
@@ -167,76 +168,76 @@ public class Faction {
         if (newPower == oldPower) return 0;
 
         power = newPower;
-        FactionEvents.POWER_CHANGE.invoker().onPowerChange(this, oldPower);
+        MinecraftForge.EVENT_BUS.post(new FactionEvents.PowerChange(this, oldPower));
         return Math.abs(newPower - oldPower);
     }
 
-    public List<User> getUsers() {
-        return User.getByFaction(id);
+    public List<io.icker.factions.api.persistents.User> getUsers() {
+        return io.icker.factions.api.persistents.User.getByFaction(id);
     }
 
-    public List<Claim> getClaims() {
-        return Claim.getByFaction(id);
+    public List<io.icker.factions.api.persistents.Claim> getClaims() {
+        return io.icker.factions.api.persistents.Claim.getByFaction(id);
     }
 
     public void removeAllClaims() {
-        Claim.getByFaction(id)
+        io.icker.factions.api.persistents.Claim.getByFaction(id)
             .stream()
-            .forEach(Claim::remove);
-        FactionEvents.REMOVE_ALL_CLAIMS.invoker().onRemoveAllClaims(this);
+            .forEach(io.icker.factions.api.persistents.Claim::remove);
+        MinecraftForge.EVENT_BUS.post(new FactionEvents.RemoveAllClaims(this));
     }
 
     public void addClaim(int x, int z, String level) {
-        Claim.add(new Claim(x, z, level, id));
+        io.icker.factions.api.persistents.Claim.add(new Claim(x, z, level, id));
     }
 
     public boolean isInvited(UUID playerID) {
         return invites.stream().anyMatch(invite -> invite.equals(playerID));
     }
 
-    public Home getHome() {
+    public io.icker.factions.api.persistents.Home getHome() {
         return home;
     }
 
     public void setHome(Home home) {
         this.home = home;
-        FactionEvents.SET_HOME.invoker().onSetHome(this, home);
+        MinecraftForge.EVENT_BUS.post(new FactionEvents.SetHome(this, home));
     }
 
-    public Relationship getRelationship(UUID target) {
-        return relationships.stream().filter(rel -> rel.target.equals(target)).findFirst().orElse(new Relationship(target, Relationship.Status.NEUTRAL));
+    public io.icker.factions.api.persistents.Relationship getRelationship(UUID target) {
+        return relationships.stream().filter(rel -> rel.target.equals(target)).findFirst().orElse(new io.icker.factions.api.persistents.Relationship(target, io.icker.factions.api.persistents.Relationship.Status.NEUTRAL));
     }
 
-    public Relationship getReverse(Relationship rel) {
+    public io.icker.factions.api.persistents.Relationship getReverse(io.icker.factions.api.persistents.Relationship rel) {
         return Faction.get(rel.target).getRelationship(id);
     }
 
     public boolean isMutualAllies(UUID target) {
-        Relationship rel = getRelationship(target);
-        return rel.status == Relationship.Status.ALLY && getReverse(rel).status == Relationship.Status.ALLY;
+        io.icker.factions.api.persistents.Relationship rel = getRelationship(target);
+        return rel.status == io.icker.factions.api.persistents.Relationship.Status.ALLY && getReverse(rel).status == io.icker.factions.api.persistents.Relationship.Status.ALLY;
     }
 
-    public List<Relationship> getMutualAllies() {
+    public List<io.icker.factions.api.persistents.Relationship> getMutualAllies() {
         return relationships.stream().filter(rel -> isMutualAllies(rel.target)).toList();
     }
 
-    public List<Relationship> getEnemiesWith() {
-        return relationships.stream().filter(rel -> rel.status == Relationship.Status.ENEMY).toList();
+    public List<io.icker.factions.api.persistents.Relationship> getEnemiesWith() {
+        return relationships.stream().filter(rel -> rel.status == io.icker.factions.api.persistents.Relationship.Status.ENEMY).toList();
     }
 
-    public List<Relationship> getEnemiesOf() {
-        return relationships.stream().filter(rel -> getReverse(rel).status == Relationship.Status.ENEMY).toList();
+    public List<io.icker.factions.api.persistents.Relationship> getEnemiesOf() {
+        return relationships.stream().filter(rel -> getReverse(rel).status == io.icker.factions.api.persistents.Relationship.Status.ENEMY).toList();
     }
 
     public void removeRelationship(UUID target) {
         relationships = new ArrayList<>(relationships.stream().filter(rel -> !rel.target.equals(target)).toList());
     }
 
-    public void setRelationship(Relationship relationship) {
+    public void setRelationship(io.icker.factions.api.persistents.Relationship relationship) {
         if (getRelationship(relationship.target) != null) {
             removeRelationship(relationship.target);
         }
-        if (relationship.status != Relationship.Status.NEUTRAL || !relationship.permissions.isEmpty())
+        if (relationship.status != io.icker.factions.api.persistents.Relationship.Status.NEUTRAL || !relationship.permissions.isEmpty())
             relationships.add(relationship);
     }
 
@@ -249,7 +250,7 @@ public class Faction {
         }
         removeAllClaims();
         STORE.remove(id);
-        FactionEvents.DISBAND.invoker().onDisband(this);
+        MinecraftForge.EVENT_BUS.post(new FactionEvents.Disband(this));
     }
 
     @Override

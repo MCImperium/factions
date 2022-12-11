@@ -1,10 +1,12 @@
 package io.icker.factions.api.persistents;
 
 import io.icker.factions.api.events.ClaimEvents;
+import io.icker.factions.api.persistents.Faction;
 import io.icker.factions.api.persistents.User.Rank;
 import io.icker.factions.database.Database;
 import io.icker.factions.database.Field;
 import io.icker.factions.database.Name;
+import net.minecraftforge.common.MinecraftForge;
 
 import java.util.HashMap;
 import java.util.List;
@@ -60,16 +62,16 @@ public class Claim {
 
     public static void add(Claim claim) {
         STORE.put(claim.getKey(), claim);
-        ClaimEvents.ADD.invoker().onAdd(claim);
+        MinecraftForge.EVENT_BUS.post(new ClaimEvents.Add(claim));
     }
 
-    public Faction getFaction() {
-        return Faction.get(factionID);
+    public io.icker.factions.api.persistents.Faction getFaction() {
+        return io.icker.factions.api.persistents.Faction.get(factionID);
     }
 
     public void remove() {
         STORE.remove(getKey());
-        ClaimEvents.REMOVE.invoker().onRemove(x, z, level, Faction.get(factionID));
+        MinecraftForge.EVENT_BUS.post(new ClaimEvents.Remove(x, z, level, Faction.get(factionID)));
     }
 
     public static void save() {

@@ -9,30 +9,30 @@ import io.icker.factions.api.persistents.Faction;
 import io.icker.factions.api.persistents.Relationship;
 import io.icker.factions.util.Command;
 import io.icker.factions.util.Message;
-import net.minecraft.server.command.CommandManager;
-import net.minecraft.server.command.ServerCommandSource;
-import net.minecraft.server.network.ServerPlayerEntity;
-import net.minecraft.util.Formatting;
-
 import java.util.Locale;
+import net.minecraft.ChatFormatting;
+import net.minecraft.commands.CommandSourceStack;
+import net.minecraft.commands.Commands;
+import net.minecraft.server.level.ServerPlayer;
+import net.minecraftforge.common.MinecraftForge;
 
 public class DeclareCommand implements Command {
-    private int ally(CommandContext<ServerCommandSource> context) throws CommandSyntaxException {
+    private int ally(CommandContext<CommandSourceStack> context) throws CommandSyntaxException {
         return updateRelationship(context, Relationship.Status.ALLY);
     }
 
-    private int neutral(CommandContext<ServerCommandSource> context) throws CommandSyntaxException {
+    private int neutral(CommandContext<CommandSourceStack> context) throws CommandSyntaxException {
         return updateRelationship(context, Relationship.Status.NEUTRAL);
     }
 
-    private int enemy(CommandContext<ServerCommandSource> context) throws CommandSyntaxException {
+    private int enemy(CommandContext<CommandSourceStack> context) throws CommandSyntaxException {
         return updateRelationship(context, Relationship.Status.ENEMY);
     }
 
-    private int updateRelationship(CommandContext<ServerCommandSource> context, Relationship.Status status) throws CommandSyntaxException {
+    private int updateRelationship(CommandContext<CommandSourceStack> context, Relationship.Status status) throws CommandSyntaxException {
         String name = StringArgumentType.getString(context, "faction");
-        ServerCommandSource source = context.getSource();
-        ServerPlayerEntity player = source.getPlayer();
+        CommandSourceStack source = context.getSource();
+        ServerPlayer player = source.getPlayer();
 
         Faction targetFaction = Faction.getByName(name);
 
@@ -63,19 +63,19 @@ public class DeclareCommand implements Command {
         Relationship rev = targetFaction.getRelationship(sourceFaction.getID());
         sourceFaction.setRelationship(rel);
 
-        RelationshipEvents.NEW_DECLARATION.invoker().onNewDecleration(rel);
+        MinecraftForge.EVENT_BUS.post(new RelationshipEvents.NewDeclaration(rel));
 
-        Message msgStatus = rel.status == Relationship.Status.ALLY ? new Message("allies").format(Formatting.GREEN) 
-        : rel.status == Relationship.Status.ENEMY ? new Message("enemies").format(Formatting.RED) 
+        Message msgStatus = rel.status == Relationship.Status.ALLY ? new Message("allies").format(ChatFormatting.GREEN) 
+        : rel.status == Relationship.Status.ENEMY ? new Message("enemies").format(ChatFormatting.RED) 
         : new Message("neutral");
 
         if (rel.status == rev.status) {
-            RelationshipEvents.NEW_MUTUAL.invoker().onNewMutual(rel);
+            MinecraftForge.EVENT_BUS.post(new RelationshipEvents.NewMutual(rel));
             new Message("You are now mutually ").add(msgStatus).add(" with " + targetFaction.getName()).send(sourceFaction);
             new Message("You are now mutually ").add(msgStatus).add(" with " + sourceFaction.getName()).send(targetFaction);
             return 1;
         } else if (mutual != null) {
-            RelationshipEvents.END_MUTUAL.invoker().onEndMutual(rel, mutual);
+            MinecraftForge.EVENT_BUS.post(new RelationshipEvents.EndMutual(rel, mutual));
         }
 
         new Message("You have declared " + targetFaction.getName() + " as ").add(msgStatus).send(sourceFaction);
@@ -91,33 +91,33 @@ public class DeclareCommand implements Command {
     }
 
     @Override
-    public LiteralCommandNode<ServerCommandSource> getNode() {
-        return CommandManager
+    public LiteralCommandNode<CommandSourceStack> getNode() {
+        return Commands
             .literal("declare")
             .requires(Requires.isLeader())
             .then(
-                CommandManager.literal("ally")
+                Commands.literal("ally")
                 .requires(Requires.hasPerms("factions.declare.ally", 0))
                 .then(
-                    CommandManager.argument("faction", StringArgumentType.greedyString())
+                    Commands.argument("faction", StringArgumentType.greedyString())
                     .suggests(Suggests.allFactions(false))
                     .executes(this::ally)
                 )
             )
             .then(
-                CommandManager.literal("neutral")
+                Commands.literal("neutral")
                 .requires(Requires.hasPerms("factions.declare.neutral", 0))
                 .then(
-                    CommandManager.argument("faction", StringArgumentType.greedyString())
+                    Commands.argument("faction", StringArgumentType.greedyString())
                     .suggests(Suggests.allFactions(false))
                     .executes(this::neutral)
                 )
             )
             .then(
-                CommandManager.literal("enemy")
+                Commands.literal("enemy")
                 .requires(Requires.hasPerms("factions.declare.enemy", 0))
                 .then(
-                    CommandManager.argument("faction", StringArgumentType.greedyString())
+                    Commands.argument("faction", StringArgumentType.greedyString())
                     .suggests(Suggests.allFactions(false))
                     .executes(this::enemy)
                 )

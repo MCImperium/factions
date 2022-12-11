@@ -9,20 +9,19 @@ import io.icker.factions.api.persistents.Faction;
 import io.icker.factions.api.persistents.User;
 import io.icker.factions.util.Command;
 import io.icker.factions.util.Message;
-import net.minecraft.server.command.CommandManager;
-import net.minecraft.server.command.ServerCommandSource;
-import net.minecraft.server.network.ServerPlayerEntity;
-import net.minecraft.util.Formatting;
-import net.minecraft.util.UserCache;
-import net.minecraft.util.Util;
-
 import java.util.List;
 import java.util.stream.Collectors;
+import net.minecraft.ChatFormatting;
+import net.minecraft.Util;
+import net.minecraft.commands.CommandSourceStack;
+import net.minecraft.commands.Commands;
+import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.server.players.GameProfileCache;
 
 public class MemberCommand implements Command {
-    private int self(CommandContext<ServerCommandSource> context) throws CommandSyntaxException {
-        ServerCommandSource source = context.getSource();
-        ServerPlayerEntity player = source.getPlayer();
+    private int self(CommandContext<CommandSourceStack> context) throws CommandSyntaxException {
+        CommandSourceStack source = context.getSource();
+        ServerPlayer player = source.getPlayer();
 
         User user = Command.getUser(player);
         if (!user.isInFaction()) {
@@ -33,11 +32,11 @@ public class MemberCommand implements Command {
         return members(player, user.getFaction());
     }
 
-    private int any(CommandContext<ServerCommandSource> context) throws CommandSyntaxException {
+    private int any(CommandContext<CommandSourceStack> context) throws CommandSyntaxException {
         String factionName = StringArgumentType.getString(context, "faction");
 
-        ServerCommandSource source = context.getSource();
-        ServerPlayerEntity player = source.getPlayer();
+        CommandSourceStack source = context.getSource();
+        ServerPlayer player = source.getPlayer();
 
         Faction faction = Faction.getByName(factionName);
         if (faction == null) {
@@ -48,69 +47,69 @@ public class MemberCommand implements Command {
         return members(player, faction);
     }
 
-    public static int members(ServerPlayerEntity player, Faction faction) {
+    public static int members(ServerPlayer player, Faction faction) {
         List<User> users = faction.getUsers();
-        UserCache cache = player.getServer().getUserCache();
+        GameProfileCache cache = player.getServer().getProfileCache();
 
         long memberCount = users.stream().filter(u -> u.rank == User.Rank.MEMBER).count();
-        String members = Formatting.WHITE +
+        String members = ChatFormatting.WHITE +
             users.stream()
                 .filter(u -> u.rank == User.Rank.MEMBER)
-                .map(user -> cache.getByUuid(user.getID()).orElse(new GameProfile(Util.NIL_UUID, "{Uncached Player}")).getName())
+                .map(user -> cache.get(user.getID()).orElse(new GameProfile(Util.NIL_UUID, "{Uncached Player}")).getName())
                 .collect(Collectors.joining(", "));
 
         long commanderCount = users.stream().filter(u -> u.rank == User.Rank.COMMANDER).count();
-        String commanders = Formatting.WHITE +
+        String commanders = ChatFormatting.WHITE +
             users.stream()
                 .filter(u -> u.rank == User.Rank.COMMANDER)
-                .map(user -> cache.getByUuid(user.getID()).orElse(new GameProfile(Util.NIL_UUID, "{Uncached Player}")).getName())
+                .map(user -> cache.get(user.getID()).orElse(new GameProfile(Util.NIL_UUID, "{Uncached Player}")).getName())
                 .collect(Collectors.joining(", "));
 
         long leaderCount = users.stream().filter(u -> u.rank == User.Rank.LEADER).count();
-        String leaders = Formatting.WHITE +
+        String leaders = ChatFormatting.WHITE +
             users.stream()
                 .filter(u -> u.rank == User.Rank.LEADER)
-                .map(user -> cache.getByUuid(user.getID()).orElse(new GameProfile(Util.NIL_UUID, "{Uncached Player}")).getName())
+                .map(user -> cache.get(user.getID()).orElse(new GameProfile(Util.NIL_UUID, "{Uncached Player}")).getName())
                 .collect(Collectors.joining(", "));
 
-        String owner = Formatting.WHITE +
+        String owner = ChatFormatting.WHITE +
             users.stream()
                 .filter(u -> u.rank == User.Rank.OWNER)
-                .map(user -> cache.getByUuid(user.getID()).orElse(new GameProfile(Util.NIL_UUID, "{Uncached Player}")).getName())
+                .map(user -> cache.get(user.getID()).orElse(new GameProfile(Util.NIL_UUID, "{Uncached Player}")).getName())
                 .collect(Collectors.joining(", "));
 
         // generate the ---
         int numDashes = 32 - faction.getName().length();
         String dashes = new StringBuilder("--------------------------------").substring(0, numDashes/2);
 
-        new Message(Formatting.BLACK + dashes + "[ " + faction.getColor() + faction.getName() + Formatting.BLACK + " ]" + dashes)
+        new Message(ChatFormatting.BLACK + dashes + "[ " + faction.getColor() + faction.getName() + ChatFormatting.BLACK + " ]" + dashes)
             .send(player, false);
-        new Message(Formatting.GOLD + "Total Members: ")
-            .add(Formatting.WHITE.toString() + users.size())
+        new Message(ChatFormatting.GOLD + "Total Members: ")
+            .add(ChatFormatting.WHITE.toString() + users.size())
             .send(player, false);
-        new Message(Formatting.GOLD + "Owner: ")
+        new Message(ChatFormatting.GOLD + "Owner: ")
             .add(owner)
             .send(player, false);
-        new Message(Formatting.GOLD + "Leaders (" + Formatting.WHITE.toString() + leaderCount + Formatting.GOLD.toString() + "): ")
+        new Message(ChatFormatting.GOLD + "Leaders (" + ChatFormatting.WHITE.toString() + leaderCount + ChatFormatting.GOLD.toString() + "): ")
             .add(leaders)
             .send(player, false);
-        new Message(Formatting.GOLD + "Commanders (" + Formatting.WHITE.toString() + commanderCount + Formatting.GOLD.toString() + "): ")
+        new Message(ChatFormatting.GOLD + "Commanders (" + ChatFormatting.WHITE.toString() + commanderCount + ChatFormatting.GOLD.toString() + "): ")
             .add(commanders)
             .send(player, false);
-        new Message(Formatting.GOLD + "Members (" + Formatting.WHITE.toString() + memberCount + Formatting.GOLD.toString() + "): ")
+        new Message(ChatFormatting.GOLD + "Members (" + ChatFormatting.WHITE.toString() + memberCount + ChatFormatting.GOLD.toString() + "): ")
             .add(members)
             .send(player, false);
 
         return 1;
     }
 
-    public LiteralCommandNode<ServerCommandSource> getNode() {
-        return CommandManager
+    public LiteralCommandNode<CommandSourceStack> getNode() {
+        return Commands
             .literal("members")
             .requires(Command.Requires.hasPerms("factions.members", 0))
             .executes(this::self)
             .then(
-                CommandManager.argument("faction", StringArgumentType.greedyString())
+                Commands.argument("faction", StringArgumentType.greedyString())
                     .requires(Command.Requires.hasPerms("factions.members.other", 0))
                     .suggests(Command.Suggests.allFactions())
                     .executes(this::any)

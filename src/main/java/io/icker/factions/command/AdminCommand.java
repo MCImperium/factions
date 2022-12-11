@@ -11,19 +11,18 @@ import io.icker.factions.api.persistents.Faction;
 import io.icker.factions.api.persistents.User;
 import io.icker.factions.util.Command;
 import io.icker.factions.util.Message;
-import net.minecraft.server.command.CommandManager;
-import net.minecraft.server.command.ServerCommandSource;
-import net.minecraft.server.network.ServerPlayerEntity;
-import net.minecraft.util.Formatting;
-
 import java.util.Optional;
 import java.util.UUID;
+import net.minecraft.ChatFormatting;
+import net.minecraft.commands.CommandSourceStack;
+import net.minecraft.commands.Commands;
+import net.minecraft.server.level.ServerPlayer;
 
 public class AdminCommand implements Command {
-    private int bypass(CommandContext<ServerCommandSource> context) throws CommandSyntaxException {
-        ServerPlayerEntity player = context.getSource().getPlayer();
+    private int bypass(CommandContext<CommandSourceStack> context) throws CommandSyntaxException {
+        ServerPlayer player = context.getSource().getPlayer();
 
-        User user = User.get(player.getUuid());
+        User user = User.get(player.getUUID());
         boolean bypass = !user.bypass;
         user.bypass = bypass;
 
@@ -31,21 +30,21 @@ public class AdminCommand implements Command {
                 .filler("·")
                 .add(
                     new Message(user.bypass ? "ON" : "OFF")
-                        .format(user.bypass ? Formatting.GREEN : Formatting.RED)
+                        .format(user.bypass ? ChatFormatting.GREEN : ChatFormatting.RED)
                 )
                 .send(player, false);
 
         return 1;
     }
 
-    private int reload(CommandContext<ServerCommandSource> context) throws CommandSyntaxException {
+    private int reload(CommandContext<CommandSourceStack> context) throws CommandSyntaxException {
         FactionsMod.dynmap.reloadAll();
         new Message("Reloaded dynmap marker").send(context.getSource().getPlayer(), false);
         return 1;
     }
 
-    private int power(CommandContext<ServerCommandSource> context) throws CommandSyntaxException {
-        ServerPlayerEntity player = context.getSource().getPlayer();
+    private int power(CommandContext<CommandSourceStack> context) throws CommandSyntaxException {
+        ServerPlayer player = context.getSource().getPlayer();
 
         Faction target = Faction.getByName(StringArgumentType.getString(context, "faction"));
         int power = IntegerArgumentType.getInteger(context, "power");
@@ -80,18 +79,18 @@ public class AdminCommand implements Command {
         return 1;
     }
 
-    private int spoof(CommandContext<ServerCommandSource> context) throws CommandSyntaxException {
-        ServerCommandSource source = context.getSource();
-        ServerPlayerEntity player = source.getPlayer();
+    private int spoof(CommandContext<CommandSourceStack> context) throws CommandSyntaxException {
+        CommandSourceStack source = context.getSource();
+        ServerPlayer player = source.getPlayer();
 
-        User user = User.get(player.getUuid());
+        User user = User.get(player.getUUID());
 
         String name = StringArgumentType.getString(context, "player");
 
         User target;
 
         Optional<GameProfile> profile;
-        if ((profile = source.getServer().getUserCache().findByName(name)).isPresent()) {
+        if ((profile = source.getServer().getProfileCache().get(name)).isPresent()) {
             target = User.get(profile.get().getId());
         } else {
             target = User.get(UUID.fromString(name));
@@ -104,11 +103,11 @@ public class AdminCommand implements Command {
         return 1;
     }
 
-    private int clearSpoof(CommandContext<ServerCommandSource> context) throws CommandSyntaxException {
-        ServerCommandSource source = context.getSource();
-        ServerPlayerEntity player = source.getPlayer();
+    private int clearSpoof(CommandContext<CommandSourceStack> context) throws CommandSyntaxException {
+        CommandSourceStack source = context.getSource();
+        ServerPlayer player = source.getPlayer();
 
-        User user = User.get(player.getUuid());
+        User user = User.get(player.getUUID());
 
         user.setSpoof(null);
 
@@ -117,36 +116,36 @@ public class AdminCommand implements Command {
         return 1;
     }
 
-    public LiteralCommandNode<ServerCommandSource> getNode() {
-        return CommandManager
+    public LiteralCommandNode<CommandSourceStack> getNode() {
+        return Commands
             .literal("admin")
             .then(
-                CommandManager.literal("bypass")
+                Commands.literal("bypass")
                 .requires(Requires.hasPerms("factions.admin.bypass", FactionsMod.CONFIG.REQUIRED_BYPASS_LEVEL))
                 .executes(this::bypass)
             )
             .then(
-                CommandManager.literal("reload")
+                Commands.literal("reload")
                 .requires(Requires.multiple(Requires.hasPerms("factions.admin.reload", FactionsMod.CONFIG.REQUIRED_BYPASS_LEVEL), source -> FactionsMod.dynmap != null))
                 .executes(this::reload)
             )
             .then(
-                CommandManager.literal("power")
+                Commands.literal("power")
                 .requires(Requires.hasPerms("factions.admin.power", FactionsMod.CONFIG.REQUIRED_BYPASS_LEVEL))
                 .then(
-                    CommandManager.argument("power", IntegerArgumentType.integer())
+                    Commands.argument("power", IntegerArgumentType.integer())
                     .then(
-                        CommandManager.argument("faction", StringArgumentType.greedyString())
+                        Commands.argument("faction", StringArgumentType.greedyString())
                         .suggests(Suggests.allFactions())
                         .executes(this::power)
                     )
                 )
             )
             .then(
-                CommandManager.literal("spoof")
+                Commands.literal("spoof")
                 .requires(Requires.hasPerms("factions.admin.spoof", FactionsMod.CONFIG.REQUIRED_BYPASS_LEVEL))
                 .then(
-                    CommandManager.argument("player", StringArgumentType.string())
+                    Commands.argument("player", StringArgumentType.string())
                         .suggests(Suggests.allPlayers())
                         .executes(this::spoof)
                 )

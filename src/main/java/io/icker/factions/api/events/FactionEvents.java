@@ -3,124 +3,104 @@ package io.icker.factions.api.events;
 import io.icker.factions.api.persistents.Faction;
 import io.icker.factions.api.persistents.Home;
 import io.icker.factions.api.persistents.User;
-import net.fabricmc.fabric.api.event.Event;
-import net.fabricmc.fabric.api.event.EventFactory;
+import net.minecraftforge.eventbus.api.Event;
 
 /**
-* Events related to {@link Faction}
-*/
+ * Events related to {@link Faction}
+ */
 public final class FactionEvents {
     /**
      * Called when a {@link Faction} is created
      */
-    public static final Event<Create> CREATE = EventFactory.createArrayBacked(Create.class, callbacks -> (faction, user) -> {
-        for (Create callback : callbacks) {
-            callback.onCreate(faction, user);
+    public static class Create extends Event {
+        public final Faction faction;
+        public final User owner;
+
+        public Create(Faction faction, User owner) {
+            this.faction = faction;
+            this.owner = owner;
         }
-    });
+    }
 
     /**
      * Called when a {@link Faction} is disbanded
      */
-    public static final Event<Disband> DISBAND = EventFactory.createArrayBacked(Disband.class, callbacks -> (faction) -> {
-        for (Disband callback : callbacks) {
-            callback.onDisband(faction);
-        }
-    });
+    public static class Disband extends Event {
+        public final Faction faction;
 
+        public Disband(Faction faction) {
+            this.faction = faction;
+        }
+    }
 
     /**
      * Called when a {@link User} joins a {@link Faction}
      */
-    public static final Event<MemberJoin> MEMBER_JOIN = EventFactory.createArrayBacked(MemberJoin.class, callbacks -> (faction, user) -> {
-        for (MemberJoin callback : callbacks) {
-            callback.onMemberJoin(faction, user);
+    public static class MemberJoin extends Event {
+        public final Faction faction;
+        public final User user;
+
+        public MemberJoin(Faction faction, User user) {
+            this.faction = faction;
+            this.user = user;
         }
-    });
+    }
 
     /**
      * Called when a {@link User} leaves a {@link Faction}
      */
-    public static final Event<MemberLeave> MEMBER_LEAVE = EventFactory.createArrayBacked(MemberLeave.class, callbacks -> (faction, user) -> {
-        for (MemberLeave callback : callbacks) {
-            callback.onMemberLeave(faction, user);
+    public static class MemberLeave extends Event {
+        public final Faction faction;
+        public final User user;
+        public MemberLeave(Faction faction, User user) {
+            this.faction = faction;
+            this.user = user;
         }
-    });
+    }
 
     /**
      * Called when a factions name, description, MOTD, color or open status is modified
      */
-    public static final Event<Modify> MODIFY = EventFactory.createArrayBacked(Modify.class, callbacks -> (faction) -> {
-        for (Modify callback : callbacks) {
-            callback.onModify(faction);
+    public static class Modify extends Event {
+        public final Faction faction;
+        public Modify(Faction faction) {
+            this.faction = faction;
         }
-    });
+    }
 
     /**
      * Called when a factions power changes
      */
-    public static final Event<PowerChange> POWER_CHANGE = EventFactory.createArrayBacked(PowerChange.class, callbacks -> (faction, oldPower) -> {
-        for (PowerChange callback : callbacks) {
-            callback.onPowerChange(faction, oldPower);
+    public static class PowerChange extends Event {
+        public final Faction faction;
+        public final int oldPower;
+
+        public PowerChange(Faction faction, int oldPower) {
+            this.faction = faction;
+            this.oldPower = oldPower;
         }
-    });
+    }
 
     /**
      * Called when a faction sets its {@link Home}
      */
-    public static final Event<SetHome> SET_HOME = EventFactory.createArrayBacked(SetHome.class, callbacks -> (faction, home) -> {
-        for (SetHome callback : callbacks) {
-            callback.onSetHome(faction, home);
+    public static class SetHome extends Event {
+        public final Faction faction;
+        public final Home home;
+        public SetHome(Faction faction, Home home) {
+            this.faction = faction;
+            this.home = home;
         }
-    });
+    }
 
     /**
      * Called when a faction removes all its claims. (Note that each claim will also run a {@link ClaimEvents} REMOVE event)
      */
-    public static final Event<RemoveAllClaims> REMOVE_ALL_CLAIMS = EventFactory.createArrayBacked(RemoveAllClaims.class, callbacks -> (faction) -> {
-        for (RemoveAllClaims callback : callbacks) {
-            callback.onRemoveAllClaims(faction);
+    public static class RemoveAllClaims extends Event {
+        public final Faction faction;
+
+        public RemoveAllClaims(Faction faction) {
+            this.faction = faction;
         }
-    });
-
-    @FunctionalInterface
-    public interface Create {
-        void onCreate(Faction faction, User owner);
-    }
-
-    @FunctionalInterface
-    public interface Disband {
-        void onDisband(Faction faction);
-    }
-
-    @FunctionalInterface
-    public interface MemberJoin {
-        void onMemberJoin(Faction faction, User user);
-    }
-
-    // TODO add Reason: LEAVE, KICK, DISBAND
-    @FunctionalInterface
-    public interface MemberLeave {
-        void onMemberLeave(Faction faction, User user);
-    }
-
-    @FunctionalInterface
-    public interface Modify {
-        void onModify(Faction faction);
-    }
-
-    @FunctionalInterface
-    public interface PowerChange {
-        void onPowerChange(Faction faction, int oldPower);
-    }
-
-    @FunctionalInterface
-    public interface SetHome {
-        void onSetHome(Faction faction, Home home);
-    }
-
-    @FunctionalInterface
-    public interface RemoveAllClaims {
-        void onRemoveAllClaims(Faction faction);
     }
 }

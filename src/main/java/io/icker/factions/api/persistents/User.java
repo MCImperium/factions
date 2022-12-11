@@ -1,9 +1,11 @@
 package io.icker.factions.api.persistents;
 
 import io.icker.factions.api.events.FactionEvents;
+import io.icker.factions.api.persistents.Faction;
 import io.icker.factions.database.Database;
 import io.icker.factions.database.Field;
 import io.icker.factions.database.Name;
+import net.minecraftforge.common.MinecraftForge;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
@@ -119,8 +121,8 @@ public class User {
     }
 
     @Nullable
-    public Faction getFaction() {
-        return Faction.get(factionID);
+    public io.icker.factions.api.persistents.Faction getFaction() {
+        return io.icker.factions.api.persistents.Faction.get(factionID);
     }
 
     public User getSpoof() {
@@ -134,14 +136,14 @@ public class User {
     public void joinFaction(UUID factionID, Rank rank) {
         this.factionID = factionID;
         this.rank = rank;
-        FactionEvents.MEMBER_JOIN.invoker().onMemberJoin(Faction.get(factionID), this);
+        MinecraftForge.EVENT_BUS.post(new FactionEvents.MemberJoin(Faction.get(factionID), this));
     }
 
     public void leaveFaction() {
         UUID oldFactionID = factionID;
         factionID = null;
         rank = null;
-        FactionEvents.MEMBER_LEAVE.invoker().onMemberLeave(Faction.get(oldFactionID), this);
+        MinecraftForge.EVENT_BUS.post(new FactionEvents.MemberLeave(Faction.get(oldFactionID), this));
     }
 
     public static Collection<User> all() {

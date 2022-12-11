@@ -1,148 +1,120 @@
 package io.icker.factions.api.events;
 
 import io.icker.factions.api.persistents.Faction;
-import net.fabricmc.fabric.api.event.Event;
-import net.fabricmc.fabric.api.event.EventFactory;
-import net.minecraft.entity.Entity;
-import net.minecraft.entity.damage.DamageSource;
-import net.minecraft.entity.player.PlayerEntity;
-import net.minecraft.item.ItemUsageContext;
-import net.minecraft.server.network.ServerPlayerEntity;
-import net.minecraft.util.ActionResult;
-import net.minecraft.util.math.BlockPos;
-import net.minecraft.world.World;
+import net.minecraft.core.BlockPos;
+import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.world.damagesource.DamageSource;
+import net.minecraft.world.entity.Entity;
+import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.item.context.UseOnContext;
+import net.minecraft.world.level.Level;
+import net.minecraftforge.event.entity.player.PlayerEvent;
+import net.minecraftforge.eventbus.api.Event;
 
 /**
-* Events related to player actions
-*/
+ * Events related to player actions
+ */
 public class PlayerEvents {
     /**
      * Called when a player tries to interact with an entity
      */
-    public static final Event<UseEntity> USE_ENTITY = EventFactory.createArrayBacked(UseEntity.class, callbacks -> (source, target, world) -> {
-        for (UseEntity callback : callbacks) {
-            ActionResult result = callback.onUseEntity(source, target, world);
-            if (result != ActionResult.PASS) {
-                return result;
-            }
-        }
-        return ActionResult.PASS;
-    });
+    @Event.HasResult
+    public static class UseEntity extends PlayerEvent {
 
-    public static final Event<PlaceBlock> PLACE_BLOCK = EventFactory.createArrayBacked(PlaceBlock.class, callbacks -> (context) -> {
-        for (PlaceBlock callback : callbacks) {
-            ActionResult result = callback.onPlaceBlock(context);
-            if (result != ActionResult.PASS) {
-                return result;
-            }
+
+        public final ServerPlayer player;
+        public final Entity entity;
+        public final Level world;
+
+        public UseEntity(ServerPlayer player, Entity entity, Level world) {
+            super(player);
+            this.player = player;
+            this.entity = entity;
+            this.world = world;
         }
-        return ActionResult.PASS;
-    });
+    }
+
+    @Event.HasResult
+    public static class PlaceBlock extends Event {
+        public final UseOnContext context;
+
+        public PlaceBlock(UseOnContext context) {
+            this.context = context;
+        }
+    }
 
     /**
      * Called when a player tries to use a block that has an inventory (uses the locking mechanism)
      */
-    public static final Event<UseInventory> USE_INVENTORY = EventFactory.createArrayBacked(UseInventory.class, callbacks -> (source, pos, world) -> {
-        for (UseInventory callback : callbacks) {
-            ActionResult result = callback.onUseInventory(source, pos, world);
-            if (result != ActionResult.PASS) {
-                return result;
-            }
+    @Event.HasResult
+    public static class UseInventory extends Event {
+        public final Player player;
+        public final BlockPos pos;
+        public final Level world;
+
+        public UseInventory(Player player, BlockPos pos, Level world) {
+            this.player = player;
+            this.pos = pos;
+            this.world = world;
         }
-        return ActionResult.PASS;
-    });
+    }
+
 
     /**
      * Called when a player is attacked and decides whether to allow the hit
      */
-    public static final Event<IsInvulnerable> IS_INVULNERABLE = EventFactory.createArrayBacked(IsInvulnerable.class, callbacks -> (source, target) -> {
-        for (IsInvulnerable callback : callbacks) {
-            ActionResult result = callback.isInvulnerable(source, target);
-            if (result != ActionResult.PASS) {
-                return result;
-            }
+    @Event.HasResult
+    public static class IsInvulnerable extends Event {
+        public final Entity source;
+        public final Entity target;
+        public IsInvulnerable(Entity source, Entity target) {
+            this.source = source;
+            this.target = target;
         }
-        return ActionResult.PASS;
-    });
+    }
 
     /**
      * Called when a player moves
      */
-    public static final Event<Move> ON_MOVE = EventFactory.createArrayBacked(Move.class, callbacks -> (player) -> {
-        for (Move callback : callbacks) {
-            callback.onMove(player);
+    public static class OnMove extends Event {
+        public final ServerPlayer player;
+        public OnMove(ServerPlayer player) {
+            this.player = player;
         }
-    });
+    }
 
     /**
      * Called when a player is killed by another player
      */
-    public static final Event<KilledByPlayer> ON_KILLED_BY_PLAYER = EventFactory.createArrayBacked(KilledByPlayer.class, callbacks -> (player, source) -> {
-        for (KilledByPlayer callback : callbacks) {
-            callback.onKilledByPlayer(player, source);
+    public static class OnKilledByPlayer extends Event {
+        public final ServerPlayer player;
+        public final DamageSource source;
+        public OnKilledByPlayer(ServerPlayer player, DamageSource source) {
+            this.player = player;
+            this.source = source;
         }
-    });
+    }
 
     /**
      * Called on a power reward will be given
      */
-    public static final Event<PowerTick> ON_POWER_TICK = EventFactory.createArrayBacked(PowerTick.class, callbacks -> (player) -> {
-        for (PowerTick callback : callbacks) {
-            callback.onPowerTick(player);
+    public static class OnPowerTick extends Event {
+        public final ServerPlayer player;
+        public OnPowerTick(ServerPlayer player) {
+            this.player = player;
         }
-    });
+    }
 
     /**
      * Called when a player attempts to open a safe
      */
-    public static final Event<OpenSafe> OPEN_SAFE = EventFactory.createArrayBacked(OpenSafe.class, callbacks -> (player, faction) -> {
-        for (OpenSafe callback : callbacks) {
-            ActionResult result = callback.onOpenSafe(player, faction);
-            if (result != ActionResult.PASS) {
-                return result;
-            }
-
+    @Event.HasResult
+    public static class OpenSafe extends Event {
+        public final Player player;
+        public final Faction faction;
+        public OpenSafe(Player player, Faction faction) {
+            this.player = player;
+            this.faction = faction;
         }
-        return ActionResult.PASS;
-    });
-
-    @FunctionalInterface
-    public interface UseEntity {
-        ActionResult onUseEntity(ServerPlayerEntity player, Entity entity, World world);
-    }
-
-    @FunctionalInterface
-    public interface PlaceBlock {
-        ActionResult onPlaceBlock(ItemUsageContext context);
-    }
-
-    @FunctionalInterface
-    public interface UseInventory {
-        ActionResult onUseInventory(PlayerEntity player, BlockPos pos, World world);
-    }
-
-    @FunctionalInterface
-    public interface IsInvulnerable {
-        ActionResult isInvulnerable(Entity source, Entity target);
-    }
-
-    @FunctionalInterface
-    public interface Move {
-        void onMove(ServerPlayerEntity player);
-    }
-
-    @FunctionalInterface
-    public interface KilledByPlayer {
-        void onKilledByPlayer(ServerPlayerEntity player, DamageSource source);
-    }
-
-    @FunctionalInterface
-    public interface PowerTick {
-        void onPowerTick(ServerPlayerEntity player);
-    }
-
-    @FunctionalInterface
-    public interface OpenSafe {
-        ActionResult onOpenSafe(PlayerEntity player, Faction faction);
     }
 }

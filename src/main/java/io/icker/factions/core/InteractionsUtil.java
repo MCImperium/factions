@@ -1,28 +1,29 @@
 package io.icker.factions.core;
 
 import io.icker.factions.api.persistents.User;
+import io.icker.factions.core.SoundManager;
 import io.icker.factions.util.Message;
-import net.minecraft.entity.player.PlayerEntity;
-import net.minecraft.item.ItemStack;
-import net.minecraft.server.network.ServerPlayerEntity;
-import net.minecraft.util.Hand;
+import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.world.InteractionHand;
+import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.item.ItemStack;
 
 public class InteractionsUtil {
-    public static void sync(PlayerEntity player, ItemStack itemStack, Hand hand) {
-        player.setStackInHand(hand, itemStack);
+    public static void sync(Player player, ItemStack itemStack, InteractionHand hand) {
+        player.setItemInHand(hand, itemStack);
         itemStack.setCount(itemStack.getCount());
-        if (itemStack.isDamageable()) {
-            itemStack.setDamage(itemStack.getDamage());
+        if (itemStack.isDamageableItem()) {
+            itemStack.setDamageValue(itemStack.getDamageValue());
         }
 
         if (!player.isUsingItem()) {
-            player.playerScreenHandler.syncState();
+            player.inventoryMenu.sendAllDataToRemote();
         }
     }
 
-    public static void warn(ServerPlayerEntity player, String action) {
+    public static void warn(ServerPlayer player, String action) {
         SoundManager.warningSound(player);
-        User user = User.get(player.getUuid());
+        User user = User.get(player.getUUID());
         new Message(
             "Cannot %s here", 
             action

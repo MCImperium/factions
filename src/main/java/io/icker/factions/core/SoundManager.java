@@ -1,40 +1,66 @@
 package io.icker.factions.core;
 
 import io.icker.factions.api.events.ClaimEvents;
-import io.icker.factions.api.events.FactionEvents;
+import io.icker.factions.api.persistents.Claim;
 import io.icker.factions.api.persistents.Faction;
 import io.icker.factions.api.persistents.User;
-import net.minecraft.registry.entry.RegistryEntry;
-import net.minecraft.server.PlayerManager;
-import net.minecraft.server.network.ServerPlayerEntity;
-import net.minecraft.sound.SoundCategory;
-import net.minecraft.sound.SoundEvent;
-import net.minecraft.sound.SoundEvents;
+import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.server.players.PlayerList;
+import net.minecraft.sounds.SoundEvent;
+import net.minecraft.sounds.SoundEvents;
+import net.minecraft.sounds.SoundSource;
+import net.minecraftforge.eventbus.api.SubscribeEvent;
 
 public class SoundManager {
-    public static PlayerManager playerManager;
+    public static PlayerList playerManager;
 
     public static void register() {
-        ClaimEvents.ADD.register(claim -> playFaction(claim.getFaction(), SoundEvents.BLOCK_NOTE_BLOCK_PLING, 2.0F));
-        ClaimEvents.REMOVE.register((x, z, level, faction) -> playFaction(faction, SoundEvents.BLOCK_NOTE_BLOCK_PLING, 0.5F));
-        FactionEvents.POWER_CHANGE.register((faction, oldPower) -> playFaction(faction, SoundEvents.BLOCK_NOTE_BLOCK_CHIME, 1F));
-        FactionEvents.MEMBER_JOIN.register((faction, user) -> playFaction(faction, SoundEvents.BLOCK_NOTE_BLOCK_BIT, 2.0F));
-        FactionEvents.MEMBER_LEAVE.register((faction, user) -> playFaction(faction, SoundEvents.BLOCK_NOTE_BLOCK_BIT, 0.5F));
+
     }
 
-    private static void playFaction(Faction faction, RegistryEntry.Reference<SoundEvent> soundEvent, float pitch) {
+    @SubscribeEvent
+    public static void add(ClaimEvents.Add event) {
+        Claim claim = event.claim;
+        playFaction(claim.getFaction(), SoundEvents.NOTE_BLOCK_PLING, 2.0F);
+    }
+
+    @SubscribeEvent
+    public static void remove(ClaimEvents.Remove event) {
+        Faction faction = event.faction;
+        playFaction(faction, SoundEvents.NOTE_BLOCK_PLING, 0.5F);
+    }
+
+    @SubscribeEvent
+    public static void powerChange(ClaimEvents.Remove event) {
+        Faction faction = event.faction;
+        playFaction(faction, SoundEvents.NOTE_BLOCK_CHIME, 1F);
+    }
+
+    @SubscribeEvent
+    public static void memberJoin(ClaimEvents.Remove event) {
+        Faction faction = event.faction;
+        playFaction(faction, SoundEvents.NOTE_BLOCK_BIT, 2.0F);
+    }
+
+    @SubscribeEvent
+    public static void memberLeave(ClaimEvents.Remove event) {
+        Faction faction = event.faction;
+        playFaction(faction, SoundEvents.NOTE_BLOCK_BIT, 0.5F);
+    }
+
+    private static void playFaction(Faction faction, SoundEvent soundEvent, float pitch) {
         for (User user : faction.getUsers()) {
-            ServerPlayerEntity player = FactionsManager.playerManager.getPlayer(user.getID());
+            ServerPlayer player = FactionsManager.playerManager.getPlayer(user.getID());
             if (player != null && (user.sounds == User.SoundMode.ALL || user.sounds == User.SoundMode.FACTION)) {
-                player.playSound(soundEvent.value(), SoundCategory.PLAYERS, 0.2F, pitch);
+                player.playNotifySound(soundEvent, SoundSource.PLAYERS, 0.2F, pitch);
             }
         }
     }
 
-    public static void warningSound(ServerPlayerEntity player) {
-        User user = User.get(player.getUuid());
+    public static void warningSound(ServerPlayer player) {
+        User user = User.get(player.getUUID());
         if (user.sounds == User.SoundMode.ALL || user.sounds == User.SoundMode.WARNINGS) {
-            player.playSound(SoundEvents.BLOCK_NOTE_BLOCK_BASS.value(), SoundCategory.PLAYERS, 0.5F, 1.0F);
+            player.playNotifySound(SoundEvents.NOTE_BLOCK_BASS, SoundSource.PLAYERS, 0.5F, 1.0F);
         }
     }
 }

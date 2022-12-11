@@ -1,7 +1,10 @@
 package io.icker.factions.command;
 
 import java.util.Collection;
-
+import net.minecraft.ChatFormatting;
+import net.minecraft.commands.CommandSourceStack;
+import net.minecraft.commands.Commands;
+import net.minecraft.server.level.ServerPlayer;
 import com.mojang.brigadier.context.CommandContext;
 import com.mojang.brigadier.exceptions.CommandSyntaxException;
 import com.mojang.brigadier.tree.LiteralCommandNode;
@@ -9,21 +12,17 @@ import com.mojang.brigadier.tree.LiteralCommandNode;
 import io.icker.factions.api.persistents.Faction;
 import io.icker.factions.util.Command;
 import io.icker.factions.util.Message;
-import net.minecraft.server.command.CommandManager;
-import net.minecraft.server.command.ServerCommandSource;
-import net.minecraft.server.network.ServerPlayerEntity;
-import net.minecraft.util.Formatting;
 
 public class ListCommand implements Command {
-    private int run(CommandContext<ServerCommandSource> context) throws CommandSyntaxException {
-        ServerCommandSource source = context.getSource();
-        ServerPlayerEntity player = source.getPlayer();
+    private int run(CommandContext<CommandSourceStack> context) throws CommandSyntaxException {
+        CommandSourceStack source = context.getSource();
+        ServerPlayer player = source.getPlayer();
 
         Collection<Faction> factions = Faction.all();
         int size = factions.size();
 
         new Message("There %s ", size == 1 ? "is" : "are")
-                .add(new Message(String.valueOf(size)).format(Formatting.YELLOW))
+                .add(new Message(String.valueOf(size)).format(ChatFormatting.YELLOW))
                 .add(" faction%s", size == 1 ? "" : "s")
                 .send(player, false);
 
@@ -39,8 +38,8 @@ public class ListCommand implements Command {
         return 1;
     }
 
-    public LiteralCommandNode<ServerCommandSource> getNode() {
-        return CommandManager
+    public LiteralCommandNode<CommandSourceStack> getNode() {
+        return Commands
             .literal("list")
             .requires(Requires.hasPerms("factions.list", 0))
             .executes(this::run)

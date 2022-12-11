@@ -10,24 +10,23 @@ import io.icker.factions.api.persistents.Faction;
 import io.icker.factions.api.persistents.Home;
 import io.icker.factions.util.Command;
 import io.icker.factions.util.Message;
-import net.minecraft.entity.damage.DamageRecord;
-import net.minecraft.registry.RegistryKey;
-import net.minecraft.server.command.CommandManager;
-import net.minecraft.server.command.ServerCommandSource;
-import net.minecraft.server.network.ServerPlayerEntity;
-import net.minecraft.server.world.ServerWorld;
-import net.minecraft.util.Identifier;
-import net.minecraft.util.math.BlockPos;
-import net.minecraft.util.math.ChunkPos;
-import net.minecraft.world.World;
-
 import java.util.Objects;
 import java.util.Optional;
+import net.minecraft.commands.CommandSourceStack;
+import net.minecraft.commands.Commands;
+import net.minecraft.core.BlockPos;
+import net.minecraft.resources.ResourceKey;
+import net.minecraft.resources.ResourceLocation;
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.world.damagesource.CombatEntry;
+import net.minecraft.world.level.ChunkPos;
+import net.minecraft.world.level.Level;
 
 public class HomeCommand implements Command {
-    private int go(CommandContext<ServerCommandSource> context) throws CommandSyntaxException {
-        ServerCommandSource source = context.getSource();
-        ServerPlayerEntity player = source.getPlayer();
+    private int go(CommandContext<CommandSourceStack> context) throws CommandSyntaxException {
+        CommandSourceStack source = context.getSource();
+        ServerPlayer player = source.getPlayer();
 
         if (player == null) return 0;
 
@@ -41,23 +40,23 @@ public class HomeCommand implements Command {
 
         if (player.getServer() == null) return 0;
 
-        Optional<RegistryKey<World>> worldKey = player.getServer().getWorldRegistryKeys().stream().filter(key -> Objects.equals(key.getValue(), new Identifier(home.level))).findAny();
+        Optional<ResourceKey<Level>> worldKey = player.getServer().levelKeys().stream().filter(key -> Objects.equals(key.location(), new ResourceLocation(home.level))).findAny();
 
         if (worldKey.isEmpty()) {
             new Message("Cannot find dimension").fail().send(player, false);
             return 0;
         }
 
-        ServerWorld world = player.getServer().getWorld(worldKey.get());
+        ServerLevel world = player.getServer().getLevel(worldKey.get());
 
         if (checkLimitToClaim(faction, world, new BlockPos(home.x, home.y, home.z))) {
             new Message("Cannot warp home to an unclaimed chunk").fail().send(player, false);
             return 0;
         }
 
-        DamageRecord damageRecord = player.getDamageTracker().getMostRecentDamage();
-        if (damageRecord == null || player.age - damageRecord.getEntityAge() > FactionsMod.CONFIG.HOME.DAMAGE_COOLDOWN) {
-            player.teleport(
+        CombatEntry damageRecord = player.getCombatTracker().getLastEntry();
+        if (damageRecord == null || player.tickCount - damageRecord.getTime() > FactionsMod.CONFIG.HOME.DAMAGE_COOLDOWN) {
+            player.teleportTo(
                     world,
                     home.x, home.y, home.z,
                     home.yaw, home.pitch
@@ -69,13 +68,13 @@ public class HomeCommand implements Command {
         return 1;
     }
 
-    private int set(CommandContext<ServerCommandSource> context) throws CommandSyntaxException {
-        ServerCommandSource source = context.getSource();
-        ServerPlayerEntity player = source.getPlayer();
+    private int set(CommandContext<CommandSourceStack> context) throws CommandSyntaxException {
+        CommandSourceStack source = context.getSource();
+        ServerPlayer player = source.getPlayer();
 
         Faction faction = Command.getUser(player).getFaction();
 
-        if (checkLimitToClaim(faction, player.getWorld(), player.getBlockPos())) {
+        if (checkLimitToClaim(faction, player.getLevel(), player.blockPosition())) {
             new Message("Cannot set home to an unclaimed chunk").fail().send(player, false);
             return 0;
         }
@@ -83,8 +82,8 @@ public class HomeCommand implements Command {
         Home home = new Home(
             faction.getID(),
             player.getX(), player.getY(), player.getZ(),
-            player.getHeadYaw(), player.getPitch(),
-            player.getWorld().getRegistryKey().getValue().toString()
+            player.getYHeadRot(), player.getXRot(),
+            player.getLevel().dimension().location().toString()
         );
 
         faction.setHome(home);
@@ -98,24 +97,24 @@ public class HomeCommand implements Command {
         return 1;
     }
 
-    private static boolean checkLimitToClaim(Faction faction, ServerWorld world, BlockPos pos) {
+    private static boolean checkLimitToClaim(Faction faction, ServerLevel world, BlockPos pos) {
         if (!FactionsMod.CONFIG.HOME.CLAIM_ONLY) return false;
 
         ChunkPos chunkPos = world.getChunk(pos).getPos();
-        String dimension = world.getRegistryKey().getValue().toString();
+        String dimension = world.dimension().location().toString();
 
         Claim possibleClaim = Claim.get(chunkPos.x, chunkPos.z, dimension);
         return possibleClaim == null || possibleClaim.getFaction().getID() != faction.getID();
     }
 
     @Override
-    public LiteralCommandNode<ServerCommandSource> getNode() {
-        return CommandManager
+    public LiteralCommandNode<CommandSourceStack> getNode() {
+        return Commands
             .literal("home")
             .requires(Requires.multiple(Requires.isMember(), s -> FactionsMod.CONFIG.HOME != null, Requires.hasPerms("factions.home", 0)))
             .executes(this::go)
             .then(
-                CommandManager.literal("set")
+                Commands.literal("set")
                 .requires(Requires.multiple(Requires.hasPerms("factions.home.set", 0), Requires.isLeader()))
                 .executes(this::set)
             )

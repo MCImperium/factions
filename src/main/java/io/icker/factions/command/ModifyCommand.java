@@ -9,20 +9,19 @@ import io.icker.factions.FactionsMod;
 import io.icker.factions.api.persistents.Faction;
 import io.icker.factions.util.Command;
 import io.icker.factions.util.Message;
-import net.minecraft.command.argument.ColorArgumentType;
-import net.minecraft.server.command.CommandManager;
-import net.minecraft.server.command.ServerCommandSource;
-import net.minecraft.server.network.ServerPlayerEntity;
-import net.minecraft.util.Formatting;
-
 import java.util.Locale;
+import net.minecraft.ChatFormatting;
+import net.minecraft.commands.CommandSourceStack;
+import net.minecraft.commands.Commands;
+import net.minecraft.commands.arguments.ColorArgument;
+import net.minecraft.server.level.ServerPlayer;
 
 public class ModifyCommand implements Command {
-    private int name(CommandContext<ServerCommandSource> context) throws CommandSyntaxException {
+    private int name(CommandContext<CommandSourceStack> context) throws CommandSyntaxException {
         String name = StringArgumentType.getString(context, "name");
 
-        ServerCommandSource source = context.getSource();
-        ServerPlayerEntity player = source.getPlayer();
+        CommandSourceStack source = context.getSource();
+        ServerPlayer player = source.getPlayer();
 
         if (FactionsMod.CONFIG.DISPLAY.NAME_BLACKLIST.contains(name.toLowerCase(Locale.ROOT))) {
             new Message("Cannot rename a faction to that name as it is on the blacklist").fail().send(player, false);
@@ -49,11 +48,11 @@ public class ModifyCommand implements Command {
         return 1;
     }
 
-    private int description(CommandContext<ServerCommandSource> context) throws CommandSyntaxException {
+    private int description(CommandContext<CommandSourceStack> context) throws CommandSyntaxException {
         String description = StringArgumentType.getString(context, "description");
 
-        ServerCommandSource source = context.getSource();
-        ServerPlayerEntity player = source.getPlayer();
+        CommandSourceStack source = context.getSource();
+        ServerPlayer player = source.getPlayer();
 
         Faction faction = Command.getUser(player).getFaction();
 
@@ -65,11 +64,11 @@ public class ModifyCommand implements Command {
         return 1;
     }
 
-    private int motd(CommandContext<ServerCommandSource> context) throws CommandSyntaxException {
+    private int motd(CommandContext<CommandSourceStack> context) throws CommandSyntaxException {
         String motd = StringArgumentType.getString(context, "motd");
 
-        ServerCommandSource source = context.getSource();
-        ServerPlayerEntity player = source.getPlayer();
+        CommandSourceStack source = context.getSource();
+        ServerPlayer player = source.getPlayer();
 
         Faction faction = Command.getUser(player).getFaction();
 
@@ -81,27 +80,27 @@ public class ModifyCommand implements Command {
         return 1;
     }
 
-    private int color(CommandContext<ServerCommandSource> context) throws CommandSyntaxException {
-        Formatting color = ColorArgumentType.getColor(context, "color");
+    private int color(CommandContext<CommandSourceStack> context) throws CommandSyntaxException {
+        ChatFormatting color = ColorArgument.getColor(context, "color");
 
-        ServerCommandSource source = context.getSource();
-        ServerPlayerEntity player = source.getPlayer();
+        CommandSourceStack source = context.getSource();
+        ServerPlayer player = source.getPlayer();
 
         Faction faction = Command.getUser(player).getFaction();
 
         faction.setColor(color);
-        new Message("Successfully updated faction color to " + Formatting.BOLD + color + color.name())
+        new Message("Successfully updated faction color to " + ChatFormatting.BOLD + color + color.name())
             .prependFaction(faction)
             .send(player, false);
 
         return 1;
     }
 
-    private int open(CommandContext<ServerCommandSource> context) throws CommandSyntaxException {
+    private int open(CommandContext<CommandSourceStack> context) throws CommandSyntaxException {
         boolean open = BoolArgumentType.getBool(context, "open");
 
-        ServerCommandSource source = context.getSource();
-        ServerPlayerEntity player = source.getPlayer();
+        CommandSourceStack source = context.getSource();
+        ServerPlayer player = source.getPlayer();
 
         Faction faction = Command.getUser(player).getFaction();
 
@@ -109,7 +108,7 @@ public class ModifyCommand implements Command {
         new Message("Successfully updated faction to ")
             .add(
                 new Message(open ? "Open" : "Closed")
-                    .format(open ? Formatting.GREEN : Formatting.RED)
+                    .format(open ? ChatFormatting.GREEN : ChatFormatting.RED)
             )
             .prependFaction(faction)
             .send(player, false);
@@ -117,52 +116,52 @@ public class ModifyCommand implements Command {
         return 1;
     }
 
-    public LiteralCommandNode<ServerCommandSource> getNode() {
-        return CommandManager
+    public LiteralCommandNode<CommandSourceStack> getNode() {
+        return Commands
             .literal("modify")
             .requires(Requires.isLeader())
             .then(
-                CommandManager
+                Commands
                 .literal("name")
                 .requires(Requires.multiple(Requires.hasPerms("factions.modify.name", 0), Requires.isOwner()))
                 .then(
-                    CommandManager.argument("name", StringArgumentType.greedyString())
+                    Commands.argument("name", StringArgumentType.greedyString())
                     .executes(this::name)
                 )
             )
             .then(
-                CommandManager
+                Commands
                 .literal("description")
                 .requires(Requires.hasPerms("factions.modify.description", 0))
                 .then(
-                    CommandManager.argument("description", StringArgumentType.greedyString())
+                    Commands.argument("description", StringArgumentType.greedyString())
                     .executes(this::description)
                 )
             )
             .then(
-                CommandManager
+                Commands
                 .literal("motd")
                 .requires(Requires.hasPerms("factions.modify.motd", 0))
                 .then(
-                    CommandManager.argument("motd", StringArgumentType.greedyString())
+                    Commands.argument("motd", StringArgumentType.greedyString())
                     .executes(this::motd)
                 )
             )
             .then(
-                CommandManager
+                Commands
                 .literal("color")
                 .requires(Requires.hasPerms("factions.modify.color", 0))
                 .then(
-                    CommandManager.argument("color", ColorArgumentType.color())
+                    Commands.argument("color", ColorArgument.color())
                     .executes(this::color)
                 )
             )
             .then(
-                CommandManager
+                Commands
                 .literal("open")
                 .requires(Requires.hasPerms("factions.modify.open", 0))
                 .then(
-                    CommandManager.argument("open", BoolArgumentType.bool())
+                    Commands.argument("open", BoolArgumentType.bool())
                     .executes(this::open)
                 )
             )

@@ -8,26 +8,26 @@ import io.icker.factions.api.persistents.Faction;
 import io.icker.factions.api.persistents.User;
 import io.icker.factions.util.Command;
 import io.icker.factions.util.Message;
-import net.minecraft.command.argument.EntityArgumentType;
-import net.minecraft.server.command.CommandManager;
-import net.minecraft.server.command.ServerCommandSource;
-import net.minecraft.server.network.ServerPlayerEntity;
-import net.minecraft.util.Formatting;
+import net.minecraft.ChatFormatting;
+import net.minecraft.commands.CommandSourceStack;
+import net.minecraft.commands.Commands;
+import net.minecraft.commands.arguments.EntityArgument;
+import net.minecraft.server.level.ServerPlayer;
 
 public class KickCommand implements Command {
-    private int run(CommandContext<ServerCommandSource> context) throws CommandSyntaxException {
-        ServerPlayerEntity target = EntityArgumentType.getPlayer(context, "player");
+    private int run(CommandContext<CommandSourceStack> context) throws CommandSyntaxException {
+        ServerPlayer target = EntityArgument.getPlayer(context, "player");
 
-        ServerCommandSource source = context.getSource();
-        ServerPlayerEntity player = source.getPlayer();
+        CommandSourceStack source = context.getSource();
+        ServerPlayer player = source.getPlayer();
 
-        if (target.getUuid().equals(player.getUuid())) {
-            new Message("Cannot kick yourself").format(Formatting.RED).send(player, false);
+        if (target.getUUID().equals(player.getUUID())) {
+            new Message("Cannot kick yourself").format(ChatFormatting.RED).send(player, false);
             return 0;
         }
 
         User selfUser = Command.getUser(player);
-        User targetUser = User.get(target.getUuid());
+        User targetUser = User.get(target.getUUID());
         Faction faction = selfUser.getFaction();
 
         if (targetUser.getFaction().getID() != faction.getID()) {
@@ -36,12 +36,12 @@ public class KickCommand implements Command {
         }
 
         if (selfUser.rank == User.Rank.LEADER && (targetUser.rank == User.Rank.LEADER || targetUser.rank == User.Rank.OWNER)) {
-            new Message("Cannot kick members with a higher of equivalent rank").format(Formatting.RED).send(player, false);
+            new Message("Cannot kick members with a higher of equivalent rank").format(ChatFormatting.RED).send(player, false);
             return 0;
         }
 
         targetUser.leaveFaction();
-        context.getSource().getServer().getPlayerManager().sendCommandTree(target);
+        context.getSource().getServer().getPlayerList().sendPlayerPermissionLevel(target);
 
         new Message("Kicked " + player.getName().getString()).send(player, false);
         new Message("You have been kicked from the faction by " + player.getName().getString()).send(target, false);
@@ -49,12 +49,12 @@ public class KickCommand implements Command {
         return 1;
     }
 
-    public LiteralCommandNode<ServerCommandSource> getNode() {
-        return CommandManager
+    public LiteralCommandNode<CommandSourceStack> getNode() {
+        return Commands
             .literal("kick")
             .requires(Requires.multiple(Requires.isLeader(), Requires.hasPerms("factions.kick", 0)))
             .then(
-                CommandManager.argument("player", EntityArgumentType.player()).executes(this::run)
+                Commands.argument("player", EntityArgument.player()).executes(this::run)
             )
             .build();
     }

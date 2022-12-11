@@ -6,11 +6,12 @@ import com.mojang.brigadier.tree.LiteralCommandNode;
 import io.icker.factions.FactionsMod;
 import io.icker.factions.api.persistents.Faction;
 import io.icker.factions.api.persistents.User;
-import me.lucko.fabric.api.permissions.v0.Permissions;
-import net.fabricmc.loader.api.FabricLoader;
-import net.minecraft.server.command.ServerCommandSource;
-import net.minecraft.server.network.ServerPlayerEntity;
-import net.minecraft.util.UserCache;
+import net.luckperms.api.LuckPerms;
+import net.luckperms.api.LuckPermsProvider;
+import net.minecraft.commands.CommandSourceStack;
+import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.server.players.GameProfileCache;
+import net.minecraftforge.fml.ModList;
 
 import java.util.Arrays;
 import java.util.Optional;
@@ -18,16 +19,18 @@ import java.util.function.Predicate;
 
 
 public interface Command {
-    public LiteralCommandNode<ServerCommandSource> getNode();
-    public static final boolean permissions = FabricLoader.getInstance().isModLoaded("fabric-permissions-api-v0");
+    LiteralCommandNode<CommandSourceStack> getNode();
+    //public static final boolean permissions = FabricLoader.getInstance().isModLoaded("fabric-permissions-api-v0");
+    //boolean permissions = ModList.get().isLoaded("luckperms");
+    boolean permissions = false;
 
-    public interface Requires {
+    interface Requires {
         boolean run(User user);
 
         @SafeVarargs
-        public static Predicate<ServerCommandSource> multiple(Predicate<ServerCommandSource>... args) {
+        static Predicate<CommandSourceStack> multiple(Predicate<CommandSourceStack>... args) {
             return source -> {
-                for (Predicate<ServerCommandSource> predicate : args) {
+                for (Predicate<CommandSourceStack> predicate : args) {
                     if (!predicate.test(source)) return false;
                 }
 
@@ -35,51 +38,60 @@ public interface Command {
             };
         }
 
-        public static Predicate<ServerCommandSource> isFactionless() {
+        static Predicate<CommandSourceStack> isFactionless() {
             return require(user -> !user.isInFaction());
         }
 
-        public static Predicate<ServerCommandSource> isMember() {
+        static Predicate<CommandSourceStack> isMember() {
             return require(user -> user.isInFaction());
         }
 
-        public static Predicate<ServerCommandSource> isCommander() {
+        static Predicate<CommandSourceStack> isCommander() {
             return require(user -> user.rank == User.Rank.COMMANDER || user.rank == User.Rank.LEADER || user.rank == User.Rank.OWNER);
         }
 
-        public static Predicate<ServerCommandSource> isLeader() {
+        static Predicate<CommandSourceStack> isLeader() {
             return require(user -> user.rank == User.Rank.LEADER || user.rank == User.Rank.OWNER);
         }
 
-        public static Predicate<ServerCommandSource> isOwner() {
+        static Predicate<CommandSourceStack> isOwner() {
             return require(user -> user.rank == User.Rank.OWNER);
         }
         
-        public static Predicate<ServerCommandSource> isAdmin() {
-            return source -> source.hasPermissionLevel(FactionsMod.CONFIG.REQUIRED_BYPASS_LEVEL);
+        static Predicate<CommandSourceStack> isAdmin() {
+            return source -> source.hasPermission(FactionsMod.CONFIG.REQUIRED_BYPASS_LEVEL);
         }
 
-        public static Predicate<ServerCommandSource> hasPerms(String permission, int defaultValue) {
-            return source -> !permissions || Permissions.check(source, permission, defaultValue);
+        static Predicate<CommandSourceStack> hasPerms(String permission, int defaultValue) {
+            return source -> true;
+            /*return source -> {
+                ServerPlayer player = source.getPlayer();
+                net.luckperms.api.model.user.User user = FactionsMod.api.getPlayerAdapter(ServerPlayer.class).getUser(player);
+                return !permissions || hasPermission(user, permission);
+            };*/
         }
 
-        public static Predicate<ServerCommandSource> require(Requires req) {
+        static boolean hasPermission(net.luckperms.api.model.user.User user, String permission) {
+            return user.getCachedData().getPermissionData().checkPermission(permission).asBoolean();
+        }
+
+        static Predicate<CommandSourceStack> require(Requires req) {
             return source -> {
-                ServerPlayerEntity entity = source.getPlayer();
+                ServerPlayer entity = source.getPlayer();
                 User user = Command.getUser(entity);
                 return req.run(user);
             };
         }
     }
 
-    public interface Suggests {
+    interface Suggests {
         String[] run(User user);
 
-        public static SuggestionProvider<ServerCommandSource> allFactions() {
+        static SuggestionProvider<CommandSourceStack> allFactions() {
             return allFactions(true);
         }
 
-        public static SuggestionProvider<ServerCommandSource> allFactions(boolean includeYou) {
+        static SuggestionProvider<CommandSourceStack> allFactions(boolean includeYou) {
             return suggest(user -> 
                 Faction.all()
                     .stream()
@@ -89,13 +101,13 @@ public interface Command {
             );
         }
 
-        static SuggestionProvider<ServerCommandSource> allPlayers() {
+        static SuggestionProvider<CommandSourceStack> allPlayers() {
             return (context, builder) -> {
-                UserCache cache = context.getSource().getServer().getUserCache();
+                GameProfileCache cache = context.getSource().getServer().getProfileCache();
 
                 for (User user : User.all()) {
                     Optional<GameProfile> player;
-                    if ((player = cache.getByUuid(user.getID())).isPresent()) {
+                    if ((player = cache.get(user.getID())).isPresent()) {
                         builder.suggest(player.get().getName());
                     } else {
                         builder.suggest(user.getID().toString());
@@ -105,7 +117,7 @@ public interface Command {
             };
         }
 
-        public static SuggestionProvider<ServerCommandSource> openFactions() {
+        static SuggestionProvider<CommandSourceStack> openFactions() {
             return suggest(user ->
                 Faction.all()
                     .stream()
@@ -115,7 +127,7 @@ public interface Command {
             );
         }
 
-        public static SuggestionProvider<ServerCommandSource> openInvitedFactions() {
+        static SuggestionProvider<CommandSourceStack> openInvitedFactions() {
             return suggest(user ->
                 Faction.all()
                     .stream()
@@ -125,7 +137,7 @@ public interface Command {
             );
         }
 
-        public static <T extends Enum<T>> SuggestionProvider<ServerCommandSource> enumSuggestion (Class<T> clazz) {
+        static <T extends Enum<T>> SuggestionProvider<CommandSourceStack> enumSuggestion (Class<T> clazz) {
             return suggest(user ->
                     Arrays.stream(clazz.getEnumConstants())
                         .map(Enum::toString)
@@ -133,10 +145,10 @@ public interface Command {
             );
         }
 
-        public static SuggestionProvider<ServerCommandSource> suggest(Suggests sug) {
+        static SuggestionProvider<CommandSourceStack> suggest(Suggests sug) {
             return (context, builder) -> {
-                ServerPlayerEntity entity = context.getSource().getPlayer();
-                User user = User.get(entity.getUuid());
+                ServerPlayer entity = context.getSource().getPlayer();
+                User user = User.get(entity.getUUID());
                 for (String suggestion : sug.run(user)) {
                     builder.suggest(suggestion);
                 }
@@ -145,8 +157,8 @@ public interface Command {
         }
     }
 
-    public static User getUser(ServerPlayerEntity player) {
-        User user = User.get(player.getUuid());
+    static User getUser(ServerPlayer player) {
+        User user = User.get(player.getUUID());
         if (user.getSpoof() == null) {
             return user;
         }

@@ -10,29 +10,28 @@ import io.icker.factions.api.persistents.Faction;
 import io.icker.factions.api.persistents.User;
 import io.icker.factions.util.Command;
 import io.icker.factions.util.Message;
-import net.minecraft.server.command.CommandManager;
-import net.minecraft.server.command.ServerCommandSource;
-import net.minecraft.server.network.ServerPlayerEntity;
-import net.minecraft.server.world.ServerWorld;
-import net.minecraft.util.Formatting;
-import net.minecraft.util.math.ChunkPos;
-
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
+import net.minecraft.ChatFormatting;
+import net.minecraft.commands.CommandSourceStack;
+import net.minecraft.commands.Commands;
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.world.level.ChunkPos;
 
 public class ClaimCommand implements Command {
-    private int list(CommandContext<ServerCommandSource> context) throws CommandSyntaxException {
-        ServerCommandSource source = context.getSource();
-        ServerPlayerEntity player = source.getPlayer();
+    private int list(CommandContext<CommandSourceStack> context) throws CommandSyntaxException {
+        CommandSourceStack source = context.getSource();
+        ServerPlayer player = source.getPlayer();
 
         List<Claim> claims = Command.getUser(player).getFaction().getClaims();
         int count = claims.size();
 
         new Message("You have ")
-                .add(new Message(String.valueOf(count)).format(Formatting.YELLOW))
+                .add(new Message(String.valueOf(count)).format(ChatFormatting.YELLOW))
                 .add(" claim%s", count == 1 ? "" : "s")
                 .send(source.getPlayer(), false);
 
@@ -53,30 +52,30 @@ public class ClaimCommand implements Command {
             level = level.substring(0, 1).toUpperCase() +
                     level.substring(1);
             claimText.add("\n");
-            claimText.add(new Message(level).format(Formatting.GRAY));
+            claimText.add(new Message(level).format(ChatFormatting.GRAY));
             claimText.filler("»");
             claimText.add(array.stream()
                     .map(claim -> String.format("(%d,%d)", claim.x, claim.z))
                     .collect(Collectors.joining(", ")));
         });
 
-        claimText.format(Formatting.ITALIC).send(source.getPlayer(), false);
+        claimText.format(ChatFormatting.ITALIC).send(source.getPlayer(), false);
         return 1;
     }
 
-    private int addForced(CommandContext<ServerCommandSource> context, int size) throws CommandSyntaxException {
-        ServerCommandSource source = context.getSource();
+    private int addForced(CommandContext<CommandSourceStack> context, int size) throws CommandSyntaxException {
+        CommandSourceStack source = context.getSource();
 
-        ServerPlayerEntity player = source.getPlayer();
-        ServerWorld world = player.getWorld();
+        ServerPlayer player = source.getPlayer();
+        ServerLevel world = player.getLevel();
 
         Faction faction = Command.getUser(player).getFaction();
-        String dimension = world.getRegistryKey().getValue().toString();
+        String dimension = world.dimension().location().toString();
         ArrayList<ChunkPos> chunks = new ArrayList<ChunkPos>();
 
         for (int x = -size + 1; x < size; x++) {
             for (int y = -size + 1; y < size; y++) {
-                ChunkPos chunkPos = world.getChunk(player.getBlockPos().add(x * 16, 0, y * 16)).getPos();
+                ChunkPos chunkPos = world.getChunk(player.blockPosition().offset(x * 16, 0, y * 16)).getPos();
                 Claim existingClaim = Claim.get(chunkPos.x, chunkPos.z, dimension);
 
                 if (existingClaim != null) {
@@ -116,8 +115,8 @@ public class ClaimCommand implements Command {
         return 1;
     }
 
-    private int add(CommandContext<ServerCommandSource> context) throws CommandSyntaxException {
-        ServerPlayerEntity player = context.getSource().getPlayer();
+    private int add(CommandContext<CommandSourceStack> context) throws CommandSyntaxException {
+        ServerPlayer player = context.getSource().getPlayer();
         Faction faction = Command.getUser(player).getFaction();
 
         int requiredPower = (faction.getClaims().size() + 1) * FactionsMod.CONFIG.POWER.CLAIM_WEIGHT;
@@ -131,9 +130,9 @@ public class ClaimCommand implements Command {
         return addForced(context, 1);
     }
 
-    private int addSize(CommandContext<ServerCommandSource> context) throws CommandSyntaxException {
+    private int addSize(CommandContext<CommandSourceStack> context) throws CommandSyntaxException {
         int size = IntegerArgumentType.getInteger(context, "size");
-        ServerPlayerEntity player = context.getSource().getPlayer();
+        ServerPlayer player = context.getSource().getPlayer();
         Faction faction = Command.getUser(player).getFaction();
 
         int requiredPower = (faction.getClaims().size() + 1) * FactionsMod.CONFIG.POWER.CLAIM_WEIGHT;
@@ -147,14 +146,14 @@ public class ClaimCommand implements Command {
         return addForced(context, size);
     }
 
-    private int remove(CommandContext<ServerCommandSource> context) throws CommandSyntaxException {
-        ServerCommandSource source = context.getSource();
+    private int remove(CommandContext<CommandSourceStack> context) throws CommandSyntaxException {
+        CommandSourceStack source = context.getSource();
 
-        ServerPlayerEntity player = source.getPlayer();
-        ServerWorld world = player.getWorld();
+        ServerPlayer player = source.getPlayer();
+        ServerLevel world = player.getLevel();
 
-        ChunkPos chunkPos = world.getChunk(player.getBlockPos()).getPos();
-        String dimension = world.getRegistryKey().getValue().toString();
+        ChunkPos chunkPos = world.getChunk(player.blockPosition()).getPos();
+        String dimension = world.dimension().location().toString();
 
         Claim existingClaim = Claim.get(chunkPos.x, chunkPos.z, dimension);
 
@@ -185,27 +184,27 @@ public class ClaimCommand implements Command {
         return 1;
     }
 
-    private int removeSize(CommandContext<ServerCommandSource> context) throws CommandSyntaxException {
+    private int removeSize(CommandContext<CommandSourceStack> context) throws CommandSyntaxException {
         int size = IntegerArgumentType.getInteger(context, "size");
-        ServerCommandSource source = context.getSource();
+        CommandSourceStack source = context.getSource();
 
-        ServerPlayerEntity player = source.getPlayer();
-        ServerWorld world = player.getWorld();
-        String dimension = world.getRegistryKey().getValue().toString();
+        ServerPlayer player = source.getPlayer();
+        ServerLevel world = player.getLevel();
+        String dimension = world.dimension().location().toString();
 
         User user = Command.getUser(player);
         Faction faction = user.getFaction();
 
         for (int x = -size + 1; x < size; x++) {
             for (int y = -size + 1; y < size; y++) {
-                ChunkPos chunkPos = world.getChunk(player.getBlockPos().add(x * 16, 0, y * 16)).getPos();
+                ChunkPos chunkPos = world.getChunk(player.blockPosition().offset(x * 16, 0, y * 16)).getPos();
                 Claim existingClaim = Claim.get(chunkPos.x, chunkPos.z, dimension);
 
                 if (existingClaim != null && (user.bypass || existingClaim.getFaction().getID() == faction.getID())) existingClaim.remove();
             }
         }
 
-        ChunkPos chunkPos = world.getChunk(player.getBlockPos().add((-size + 1) * 16, 0, (-size + 1) * 16)).getPos();
+        ChunkPos chunkPos = world.getChunk(player.blockPosition().offset((-size + 1) * 16, 0, (-size + 1) * 16)).getPos();
         new Message(
             "Claims (%d, %d) to (%d, %d) removed by %s ",
             chunkPos.x,
@@ -218,9 +217,9 @@ public class ClaimCommand implements Command {
         return 1;
     }
 
-    private int removeAll(CommandContext<ServerCommandSource> context) throws CommandSyntaxException {
-        ServerCommandSource source = context.getSource();
-        ServerPlayerEntity player = source.getPlayer();
+    private int removeAll(CommandContext<CommandSourceStack> context) throws CommandSyntaxException {
+        CommandSourceStack source = context.getSource();
+        ServerPlayer player = source.getPlayer();
 
         Faction faction = Command.getUser(player).getFaction();
 
@@ -232,9 +231,9 @@ public class ClaimCommand implements Command {
         return 1;
     }
 
-    private int auto(CommandContext<ServerCommandSource> context) throws CommandSyntaxException {
-        ServerCommandSource source = context.getSource();
-        ServerPlayerEntity player = source.getPlayer();
+    private int auto(CommandContext<CommandSourceStack> context) throws CommandSyntaxException {
+        CommandSourceStack source = context.getSource();
+        ServerPlayer player = source.getPlayer();
 
         User user = Command.getUser(player);
         user.autoclaim = !user.autoclaim;
@@ -243,7 +242,7 @@ public class ClaimCommand implements Command {
             .filler("·")
             .add(
                 new Message(user.autoclaim ? "ON" : "OFF")
-                    .format(user.autoclaim ? Formatting.GREEN : Formatting.RED)
+                    .format(user.autoclaim ? ChatFormatting.GREEN : ChatFormatting.RED)
             )
             .send(player, false);
 
@@ -251,14 +250,14 @@ public class ClaimCommand implements Command {
     }
 
     @SuppressWarnings("")
-    private int setAccessLevel(CommandContext<ServerCommandSource> context, boolean increase) throws CommandSyntaxException {
-        ServerCommandSource source = context.getSource();
+    private int setAccessLevel(CommandContext<CommandSourceStack> context, boolean increase) throws CommandSyntaxException {
+        CommandSourceStack source = context.getSource();
 
-        ServerPlayerEntity player = source.getPlayer();
-        ServerWorld world = player.getWorld();
+        ServerPlayer player = source.getPlayer();
+        ServerLevel world = player.getLevel();
 
-        ChunkPos chunkPos = world.getChunk(player.getBlockPos()).getPos();
-        String dimension = world.getRegistryKey().getValue().toString();
+        ChunkPos chunkPos = world.getChunk(player.blockPosition()).getPos();
+        String dimension = world.dimension().location().toString();
 
         Claim claim = Claim.get(chunkPos.x, chunkPos.z, dimension);
 
@@ -316,18 +315,18 @@ public class ClaimCommand implements Command {
     }
 
     @Override
-    public LiteralCommandNode<ServerCommandSource> getNode() {
-        return CommandManager
+    public LiteralCommandNode<CommandSourceStack> getNode() {
+        return Commands
             .literal("claim")
             .requires(Requires.isCommander())
             .then(
-                CommandManager.literal("add")
+                Commands.literal("add")
                 .requires(Requires.hasPerms("factions.claim.add", 0))
                 .then(
-                    CommandManager.argument("size", IntegerArgumentType.integer(1, 7))
+                    Commands.argument("size", IntegerArgumentType.integer(1, 7))
                     .requires(Requires.hasPerms("factions.claim.add.size", 0))
                     .then(
-                        CommandManager.literal("force")
+                        Commands.literal("force")
                         .requires(Requires.hasPerms("factions.claim.add.force", 0))
                         .executes(context -> addForced(context, IntegerArgumentType.getInteger(context, "size")))
                     )
@@ -336,40 +335,40 @@ public class ClaimCommand implements Command {
                 .executes(this::add)
             )
             .then(
-                CommandManager.literal("list")
+                Commands.literal("list")
                 .requires(Requires.hasPerms("factions.claim.list", 0))
                 .executes(this::list)
             )
             .then(
-                CommandManager.literal("remove")
+                Commands.literal("remove")
                 .requires(Requires.hasPerms("factions.claim.remove", 0))
                 .then(
-                    CommandManager.argument("size", IntegerArgumentType.integer(1, 7))
+                    Commands.argument("size", IntegerArgumentType.integer(1, 7))
                     .requires(Requires.hasPerms("factions.claim.remove.size", 0))
                     .executes(this::removeSize)
                 )
                 .then(
-                    CommandManager.literal("all")
+                    Commands.literal("all")
                     .requires(Requires.hasPerms("factions.claim.remove.all", 0))
                     .executes(this::removeAll)
                 )
                 .executes(this::remove)
             )
             .then(
-                CommandManager.literal("auto")
+                Commands.literal("auto")
                 .requires(Requires.hasPerms("factions.claim.auto", 0))
                 .executes(this::auto)
             )
             .then(
-                CommandManager.literal("access")
+                Commands.literal("access")
                 .requires(Requires.hasPerms("factions.claim.access", 0))
                 .then(
-                    CommandManager.literal("increase")
+                    Commands.literal("increase")
                     .requires(Requires.hasPerms("factions.claim.access.increase", 0))
                     .executes((context) -> setAccessLevel(context, true))
                 )
                 .then(
-                    CommandManager.literal("decrease")
+                    Commands.literal("decrease")
                     .requires(Requires.hasPerms("factions.claim.access.decrease", 0))
                     .executes((context) -> setAccessLevel(context, false))
                 )

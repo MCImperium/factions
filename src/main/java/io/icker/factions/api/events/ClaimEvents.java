@@ -2,8 +2,7 @@ package io.icker.factions.api.events;
 
 import io.icker.factions.api.persistents.Claim;
 import io.icker.factions.api.persistents.Faction;
-import net.fabricmc.fabric.api.event.Event;
-import net.fabricmc.fabric.api.event.EventFactory;
+import net.minecraftforge.eventbus.api.Event;
 
 /**
 * Events related to {@link Claim}
@@ -12,28 +11,26 @@ public final class ClaimEvents {
     /**
      * Called when a chunk claim is added by a faction (See {@link Claim})
      */
-    public static final Event<Add> ADD = EventFactory.createArrayBacked(Add.class, callbacks -> (claim) -> {
-        for (Add callback : callbacks) {
-            callback.onAdd(claim);
+    public static class Add extends Event {
+        public final Claim claim;
+        public Add(Claim claim) {
+            this.claim = claim;
         }
-    });
-
+    }
     /**
      * Called when a faction removes a claim (See {@link Claim})
      */
-    public static final Event<Remove> REMOVE = EventFactory.createArrayBacked(Remove.class, callbacks -> (x, z, level, faction) -> {
-        for (Remove callback : callbacks) {
-            callback.onRemove(x, z, level, faction);
+    public static class Remove extends Event {
+
+        public final int x;
+        public final int z;
+        public final String level;
+        public final Faction faction;
+        public Remove(int x, int z, String level, Faction faction) {
+            this.x = x;
+            this.z = z;
+            this.level = level;
+            this.faction = faction;
         }
-    });
-
-    @FunctionalInterface
-    public interface Add {
-        void onAdd(Claim claim);
-    }
-
-    @FunctionalInterface
-    public interface Remove {
-        void onRemove(int x, int z, String level, Faction faction);
     }
 }

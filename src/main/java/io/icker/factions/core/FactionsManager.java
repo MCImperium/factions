@@ -6,71 +6,86 @@ import io.icker.factions.api.events.PlayerEvents;
 import io.icker.factions.api.persistents.Faction;
 import io.icker.factions.api.persistents.User;
 import io.icker.factions.util.Message;
-import net.fabricmc.fabric.api.event.lifecycle.v1.ServerLifecycleEvents;
-import net.minecraft.entity.damage.DamageSource;
-import net.minecraft.entity.player.PlayerEntity;
-import net.minecraft.network.packet.s2c.play.PlayerListS2CPacket;
-import net.minecraft.screen.GenericContainerScreenHandler;
-import net.minecraft.screen.SimpleNamedScreenHandlerFactory;
+import net.minecraft.network.chat.Component;
+import net.minecraft.network.protocol.game.ClientboundPlayerInfoPacket;
 import net.minecraft.server.MinecraftServer;
-import net.minecraft.server.PlayerManager;
-import net.minecraft.server.network.ServerPlayerEntity;
-import net.minecraft.text.Text;
-import net.minecraft.util.ActionResult;
+import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.server.players.PlayerList;
+import net.minecraft.world.SimpleMenuProvider;
+import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.inventory.ChestMenu;
+import net.minecraftforge.event.server.ServerStartedEvent;
+import net.minecraftforge.eventbus.api.Event;
+import net.minecraftforge.eventbus.api.SubscribeEvent;
 
-import java.util.EnumSet;
 import java.util.List;
 
 public class FactionsManager {
-    public static PlayerManager playerManager;
+    public static PlayerList playerManager;
 
     public static void register() {
-        ServerLifecycleEvents.SERVER_STARTED.register(FactionsManager::serverStarted);
-        FactionEvents.MODIFY.register(FactionsManager::factionModified);
-        FactionEvents.MEMBER_JOIN.register(FactionsManager::memberChange);
-        FactionEvents.MEMBER_LEAVE.register(FactionsManager::memberChange);
-        PlayerEvents.ON_KILLED_BY_PLAYER.register(FactionsManager::playerDeath);
-        PlayerEvents.ON_POWER_TICK.register(FactionsManager::powerTick);
-        PlayerEvents.OPEN_SAFE.register(FactionsManager::openSafe);
+
     }
 
-    private static void serverStarted(MinecraftServer server) {
-        playerManager = server.getPlayerManager();
-        Message.manager = server.getPlayerManager();
+    @SubscribeEvent
+    public static void serverStarted(ServerStartedEvent event) {
+        MinecraftServer server = event.getServer();
+        playerManager = server.getPlayerList();
+        Message.manager = server.getPlayerList();
     }
 
-    private static void factionModified(Faction faction) {
-        ServerPlayerEntity[] players = faction.getUsers()
-            .stream()
-            .map(user -> playerManager.getPlayer(user.getID()))
-            .filter(player -> player != null)
-            .toArray(ServerPlayerEntity[]::new);
+    @SubscribeEvent
+    public static void factionModified(FactionEvents.Modify event) {
+        Faction faction = event.faction;
+        ServerPlayer[] players = faction.getUsers()
+                .stream()
+                .map(user -> playerManager.getPlayer(user.getID()))
+                .filter(player -> player != null)
+                .toArray(ServerPlayer[]::new);
         updatePlayerList(players);
     }
 
-    private static void memberChange(Faction faction, User user) {
-        ServerPlayerEntity player = playerManager.getPlayer(user.getID());
+    @SubscribeEvent
+    public static void memberJoin(FactionEvents.MemberJoin event) {
+        Faction faction = event.faction;
+        User user = event.user;
+        handleMemberChange(faction, user);
+    }
+
+    @SubscribeEvent
+    public static void memberLeave(FactionEvents.MemberLeave event) {
+        Faction faction = event.faction;
+        User user = event.user;
+        handleMemberChange(faction, user);
+    }
+
+    private static void handleMemberChange(Faction faction, User user) {
+        ServerPlayer player = playerManager.getPlayer(user.getID());
         if (player != null) {
             updatePlayerList(player);
         }
     }
 
-    private static void playerDeath(ServerPlayerEntity player, DamageSource source) {
-        User member = User.get(player.getUuid());
+    @SubscribeEvent
+    public static void playerDeath(PlayerEvents.OnKilledByPlayer event) {
+        ServerPlayer player = event.player;
+        User member = User.get(player.getUUID());
         if (!member.isInFaction()) return;
 
         Faction faction = member.getFaction();
 
         int adjusted = faction.adjustPower(-FactionsMod.CONFIG.POWER.DEATH_PENALTY);
         new Message(
-            "%s lost %d power from dying",
-            player.getName().getString(),
-            adjusted
+                "%s lost %d power from dying",
+                player.getName().getString(),
+                adjusted
         ).send(faction);
     }
 
-    private static void powerTick(ServerPlayerEntity player) {
-        User member = User.get(player.getUuid());
+    @SubscribeEvent
+    public static void powerTick(PlayerEvents.OnPowerTick event) {
+        ServerPlayer player = event.player;
+        User member = User.get(player.getUUID());
         if (!member.isInFaction()) return;
 
         Faction faction = member.getFaction();
@@ -78,40 +93,45 @@ public class FactionsManager {
         int adjusted = faction.adjustPower(FactionsMod.CONFIG.POWER.POWER_TICKS.REWARD);
         if (adjusted != 0)
             new Message(
-                "%s gained %d power from surviving",
-                player.getName().getString(),
-                adjusted
+                    "%s gained %d power from surviving",
+                    player.getName().getString(),
+                    adjusted
             ).send(faction);
     }
 
-    private static void updatePlayerList(ServerPlayerEntity ...players) {
-        playerManager.sendToAll(new PlayerListS2CPacket(EnumSet.of(PlayerListS2CPacket.Action.UPDATE_DISPLAY_NAME), List.of(players)));
+    private static void updatePlayerList(ServerPlayer... players) {
+        playerManager.broadcastAll(new ClientboundPlayerInfoPacket(ClientboundPlayerInfoPacket.Action.UPDATE_DISPLAY_NAME, List.of(players)));
     }
 
-    private static ActionResult openSafe(PlayerEntity player, Faction faction) {
-        User user =  User.get(player.getUuid());
+    @SubscribeEvent
+    public static void openSafe(PlayerEvents.OpenSafe event) {
+        Player player = event.player;
+        Faction faction = event.faction;
+        User user = User.get(player.getUUID());
 
         if (!user.isInFaction()) {
             if (FactionsMod.CONFIG.SAFE != null && FactionsMod.CONFIG.SAFE.ENDER_CHEST) {
                 new Message("Cannot use enderchests when not in a faction").fail().send(player, false);
-                return ActionResult.FAIL;
+                event.setResult(Event.Result.DENY);
+                return;
             }
-            return ActionResult.PASS;
+            //return InteractionResult.PASS;
+            //no-op
         }
 
-        player.openHandledScreen(
-            new SimpleNamedScreenHandlerFactory(
-                (syncId, inventory, p) -> {
-                    if (FactionsMod.CONFIG.SAFE.DOUBLE) {
-                        return GenericContainerScreenHandler.createGeneric9x6(syncId, inventory, faction.getSafe());
-                    } else {
-                        return GenericContainerScreenHandler.createGeneric9x3(syncId, inventory, faction.getSafe());
-                    }
-                },
-                Text.of(String.format("%s's Safe", faction.getName()))
-            )
+        player.openMenu(
+                new SimpleMenuProvider(
+                        (syncId, inventory, p) -> {
+                            if (FactionsMod.CONFIG.SAFE.DOUBLE) {
+                                return ChestMenu.sixRows(syncId, inventory, faction.getSafe());
+                            } else {
+                                return ChestMenu.threeRows(syncId, inventory, faction.getSafe());
+                            }
+                        },
+                        Component.nullToEmpty(String.format("%s's Safe", faction.getName()))
+                )
         );
 
-        return ActionResult.SUCCESS;
+        //return InteractionResult.SUCCESS;
     }
 }

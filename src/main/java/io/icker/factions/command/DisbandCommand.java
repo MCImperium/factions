@@ -8,15 +8,15 @@ import io.icker.factions.api.persistents.Faction;
 import io.icker.factions.api.persistents.User;
 import io.icker.factions.util.Command;
 import io.icker.factions.util.Message;
-import net.minecraft.server.PlayerManager;
-import net.minecraft.server.command.CommandManager;
-import net.minecraft.server.command.ServerCommandSource;
-import net.minecraft.server.network.ServerPlayerEntity;
+import net.minecraft.commands.CommandSourceStack;
+import net.minecraft.commands.Commands;
+import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.server.players.PlayerList;
 
 public class DisbandCommand implements Command {
-    private int run(CommandContext<ServerCommandSource> context) throws CommandSyntaxException {
-        ServerCommandSource source = context.getSource();
-        ServerPlayerEntity player = source.getPlayer();
+    private int run(CommandContext<CommandSourceStack> context) throws CommandSyntaxException {
+        CommandSourceStack source = context.getSource();
+        ServerPlayer player = source.getPlayer();
 
         User user = Command.getUser(player);
         Faction faction = user.getFaction();
@@ -24,16 +24,16 @@ public class DisbandCommand implements Command {
         new Message(player.getName().getString() + " disbanded the faction").send(faction);
         faction.remove();
 
-        PlayerManager manager = source.getServer().getPlayerManager();
-        for (ServerPlayerEntity p : manager.getPlayerList()) {
-            manager.sendCommandTree(p);
+        PlayerList manager = source.getServer().getPlayerList();
+        for (ServerPlayer p : manager.getPlayers()) {
+            manager.sendPlayerPermissionLevel(p);
         }
         return 1;
     }
 
     @Override
-    public LiteralCommandNode<ServerCommandSource> getNode() {
-        return CommandManager
+    public LiteralCommandNode<CommandSourceStack> getNode() {
+        return Commands
             .literal("disband")
             .requires(Requires.multiple(Requires.isOwner(), Requires.hasPerms("factions.disband", 0)))
             .executes(this::run)

@@ -4,7 +4,8 @@ import com.google.gson.*;
 import com.google.gson.annotations.SerializedName;
 import io.icker.factions.FactionsMod;
 import io.icker.factions.api.persistents.Relationship;
-import net.fabricmc.loader.api.FabricLoader;
+import net.minecraftforge.fml.loading.FMLConfig;
+import net.minecraftforge.fml.loading.FMLPaths;
 import org.jetbrains.annotations.Nullable;
 
 import java.io.File;
@@ -15,16 +16,16 @@ import java.util.List;
 
 public class Config {
     private static final int REQUIRED_VERSION = 3;
-    private static final File file = FabricLoader.getInstance().getGameDir().resolve("config").resolve("factions.json").toFile();
+    private static final File file = FMLPaths.GAMEDIR.get().resolve(FMLConfig.defaultConfigPath()).resolve("factions.json").toFile();
 
     public static Config load() {
         Gson gson = new GsonBuilder()
             .setPrettyPrinting()
             .disableHtmlEscaping()
             .serializeNulls()
-            .registerTypeAdapter(HomeConfig.class, new Deserializer<>(HomeConfig.class))
-            .registerTypeAdapter(PowerConfig.class, new Deserializer<>(PowerConfig.class))
-            .registerTypeAdapter(SafeConfig.class, new Deserializer<>(SafeConfig.class))
+            .registerTypeAdapter(io.icker.factions.config.HomeConfig.class, new Deserializer<>(io.icker.factions.config.HomeConfig.class))
+            .registerTypeAdapter(io.icker.factions.config.PowerConfig.class, new Deserializer<>(io.icker.factions.config.PowerConfig.class))
+            .registerTypeAdapter(io.icker.factions.config.SafeConfig.class, new Deserializer<>(io.icker.factions.config.SafeConfig.class))
             .create();
 
         try {
@@ -57,15 +58,15 @@ public class Config {
     public int VERSION = REQUIRED_VERSION;
 
     @SerializedName("power")
-    public PowerConfig POWER = new PowerConfig();
+    public io.icker.factions.config.PowerConfig POWER = new PowerConfig();
 
     @SerializedName("safe")
     @Nullable
-    public SafeConfig SAFE = new SafeConfig();
+    public io.icker.factions.config.SafeConfig SAFE = new SafeConfig();
 
     @SerializedName("home")
     @Nullable
-    public HomeConfig HOME = new HomeConfig();
+    public io.icker.factions.config.HomeConfig HOME = new HomeConfig();
 
     @SerializedName("display")
     public DisplayConfig DISPLAY = new DisplayConfig();
