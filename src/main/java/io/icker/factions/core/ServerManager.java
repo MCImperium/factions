@@ -7,6 +7,7 @@ import io.icker.factions.api.persistents.User;
 import io.icker.factions.util.Message;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraftforge.event.entity.player.PlayerEvent;
+import net.minecraftforge.event.level.LevelEvent;
 import net.minecraftforge.event.server.ServerStoppingEvent;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
 
@@ -27,6 +28,15 @@ public class ServerManager {
         Faction.save();
         User.save();
     }
+
+    @SubscribeEvent
+    public static void saveLvl(LevelEvent.Save event) {
+        Claim.save();
+        Faction.save();
+        User.save();
+    }
+
+
 
     @SubscribeEvent
     public static void playerJoin(PlayerEvent.PlayerLoggedInEvent event) {
